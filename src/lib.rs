@@ -1,7 +1,9 @@
 pub mod channel;
 pub mod serialize;
+pub mod choreography;
 
-pub use rumpsteak_macros::{session, Message, Role, Roles};
+pub use rumpsteak_macros::{session, Message, Role, Roles, choreography};
+pub use choreography::{Choreography, Protocol, Role as ChoreographicRole};
 
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use std::{

@@ -4,7 +4,7 @@ use hyper::{
     http::uri::{Authority, PathAndQuery, Scheme},
     Uri,
 };
-use rumpsteak::{channel::Nil, session, try_session, End, Receive, Role, Send};
+use rumpsteak_aura::{channel::Nil, session, try_session, End, Receive, Role, Send};
 use std::{any::Any, marker, mem};
 use tracing::error;
 

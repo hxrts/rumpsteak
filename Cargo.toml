@@ -1,12 +1,13 @@
 [package]
-name = "rumpsteak"
-version = "0.1.0"
-authors = ["Zak Cutner <me@zakcutner.uk>"]
-edition = "2018"
-description = "Session types for asynchronous communication between multiple parties."
+name = "rumpsteak-aura"
+version = "0.1.1-aura"
+authors = ["Zak Cutner <me@zakcutner.uk>", "Aura Team"]
+edition = "2021"
+rust-version = "1.75"
+description = "Session types for asynchronous communication between multiple parties - Aura fork for threshold cryptography choreographies."
 readme = "README.md"
-repository = "https://github.com/zakcutner/rumpsteak"
-license = "MIT"
+repository = "https://github.com/aura-project/rumpsteak-aura"
+license = "MIT OR Apache-2.0"
 keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]
 
@@ -32,19 +33,35 @@ harness = false
 
 [dependencies]
 futures = "0.3"
+time = { version = "0.3", features = ["serde"] }
+base64 = "0.21"
+hex = "0.4"
 rumpsteak-fsm = { path = "fsm", version = "0.1", optional = true }
 rumpsteak-macros = { path = "macros", version = "0.1" }
 thiserror = "1.0"
+anyhow = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+tracing = "0.1"
+# Dependencies for choreography module
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
 criterion = "0.3"
 futures = { version = "0.3", features = ["thread-pool"] }
 num-complex = "0.4"
-rand = { version = "0.8" }
+rand = "0.8"
 rumpsteak-fsm = { path = "fsm", features = ["subtyping"] }
 rumpsteak-oneshot = { path = "oneshot" }
 tempfile = "3.2"
-tokio = { version = "1.6", features = ["macros", "rt", "time"] }
+tokio = { version = "1.35", features = ["macros", "rt", "time"] }
+proptest = "1.4"
+anyhow = "1.0"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]
 serialize = ["rumpsteak-fsm", "rumpsteak-macros/serialize"]
@@ -56,4 +73,20 @@ debug = true
 debug = true
 
 [workspace]
-members = ["caching", "fsm", "generate", "macros", "oneshot"]
+members = ["caching", "fsm", "macros", "oneshot"]
+# Note: "generate" excluded due to dot-parser API compatibility issues
+# Note: "comparison" excluded - requires nightly Rust features not available in stable
+
+# Align with Aura project standards
+[workspace.lints.clippy]
+disallowed_methods = "deny"
+disallowed_types = "deny"
+missing_docs_in_private_items = "allow"
+too_many_arguments = "warn"
+type_complexity = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"

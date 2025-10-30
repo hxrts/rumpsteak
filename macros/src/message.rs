@@ -10,7 +10,7 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
 
     if let Data::Struct(_) = &input.data {
         return Ok(quote! {
-            impl #impl_generics ::rumpsteak::Message<Self> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak_aura::Message<Self> for #ident #ty_generics #where_clause {
                 fn upcast(label: Self) -> Self {
                     label
                 }
@@ -46,7 +46,7 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
 
         let ty = &field.ty;
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::Message<#ty> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak_aura::Message<#ty> for #ident #ty_generics #where_clause {
                 fn upcast(label: #ty) -> Self {
                     Self::#variant_ident(label)
                 }

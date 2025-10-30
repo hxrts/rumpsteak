@@ -1,1 +1,0 @@
-Running examples/simple_adder/simple_adder.rs

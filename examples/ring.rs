@@ -1,5 +1,5 @@
 use futures::{channel::mpsc, executor, try_join};
-use rumpsteak::{session, try_session, End, Message, Receive, Role, Roles, Send};
+use rumpsteak_aura::{session, try_session, End, Message, Receive, Role, Roles, Send};
 use std::{error::Error, result};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;

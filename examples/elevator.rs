@@ -4,7 +4,7 @@ use futures::{
     FutureExt,
 };
 use rand::Rng;
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
     Select, Send,
 };

@@ -4,7 +4,7 @@ use fred::{
     types::{RedisValue, SetOptions::NX},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use rumpsteak::{channel::Nil, session, try_session, Branch, End, Receive, Role, Send};
+use rumpsteak_aura::{channel::Nil, session, try_session, Branch, End, Receive, Role, Send};
 use std::{any::Any, marker, time::Duration};
 use tokio::time;
 use tracing::{debug, error};

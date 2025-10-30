@@ -4,7 +4,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::Bidirectional, serialize, session, Branch, Message, Role, Roles, Select, Send,
 };
 use rumpsteak_fsm::subtype;

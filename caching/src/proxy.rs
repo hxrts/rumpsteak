@@ -5,7 +5,7 @@ use crate::{
     Channel, Entry, Request, Response, Result,
 };
 use hyper::{body::HttpBody, header::HeaderValue, Method, StatusCode, Uri};
-use rumpsteak::{session, try_session, End, Receive, Role, Select, Send};
+use rumpsteak_aura::{session, try_session, End, Receive, Role, Select, Send};
 use serde::Serialize;
 use std::{any::Any, marker};
 use tracing::{debug, error};

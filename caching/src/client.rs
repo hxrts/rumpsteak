@@ -1,6 +1,6 @@
 use crate::{cache::Cache, origin::Origin, proxy::Proxy, Channel, Request, Response, Result};
 use hyper::Body;
-use rumpsteak::{channel::Nil, session, try_session, End, Receive, Role, Send};
+use rumpsteak_aura::{channel::Nil, session, try_session, End, Receive, Role, Send};
 use std::{any::Any, marker};
 use tracing::error;
 

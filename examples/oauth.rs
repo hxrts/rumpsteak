@@ -29,7 +29,7 @@ use futures::{
     executor, try_join,
 };
 #[allow(unused_imports)]
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
     Select, Send,
 };

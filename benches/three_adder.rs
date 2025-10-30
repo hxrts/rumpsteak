@@ -5,7 +5,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor, try_join,
 };
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
 };
 use std::{error::Error, result};
