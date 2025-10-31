@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::mpsc;
-use rumpsteak::{session, try_session, End, Message, Receive, Role, Roles, Send};
+use rumpsteak_aura::{session, try_session, End, Message, Receive, Role, Roles, Send};
 use std::{error::Error, result, time::Duration};
 use tokio::{runtime, time, try_join};
 

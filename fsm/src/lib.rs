@@ -459,7 +459,7 @@ impl<R, N, E> Fsm<R, N, E> {
 
     pub fn transitions(
         &self,
-    ) -> impl Iterator<Item = (StateIndex, StateIndex, TransitionRef<R, N, E>)> {
+    ) -> impl Iterator<Item = (StateIndex, StateIndex, TransitionRef<'_, R, N, E>)> {
         self.graph.edge_references().map(move |edge| {
             let (source, target) = (StateIndex(edge.source()), StateIndex(edge.target()));
             match &self.graph[edge.source()] {
@@ -476,7 +476,7 @@ impl<R, N, E> Fsm<R, N, E> {
     pub fn transitions_from(
         &self,
         StateIndex(index): StateIndex,
-    ) -> impl Iterator<Item = (StateIndex, TransitionRef<R, N, E>)> {
+    ) -> impl Iterator<Item = (StateIndex, TransitionRef<'_, R, N, E>)> {
         self.graph
             .edges(index)
             .map(move |edge| match &self.graph[index] {

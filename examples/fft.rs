@@ -3,7 +3,7 @@ use futures::{
     executor, try_join,
 };
 use num_complex::{Complex, Complex32};
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::{Bidirectional, Nil},
     session, try_session, End, Message, Receive, Role, Roles, Route, Send,
 };

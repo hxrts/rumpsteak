@@ -2,7 +2,7 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     try_join,
 };
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::{Bidirectional, Nil},
     session, try_session, End, Message, Receive, Role, Roles, Send,
 };

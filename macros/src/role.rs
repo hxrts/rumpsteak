@@ -12,7 +12,7 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let mut output = quote! {
-        impl ::rumpsteak::Role for #ident {
+        impl ::rumpsteak_aura::Role for #ident {
             type Message = #message;
         }
     };
@@ -32,7 +32,7 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
         };
 
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::Route<#route> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak_aura::Route<#route> for #ident #ty_generics #where_clause {
                 type Route = #field_ty;
 
                 fn route(&mut self) -> &mut Self::Route {

@@ -1,6 +1,6 @@
 use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 #[allow(unused_imports)]
-use ::rumpsteak::{
+use ::rumpsteak_aura::{
     channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send,
 };
 

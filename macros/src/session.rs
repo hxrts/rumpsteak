@@ -73,7 +73,7 @@ fn session_type(mut input: ItemType) -> TokenStream {
     let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role),
+        parse_quote!('__r, __R: ::rumpsteak_aura::Role),
     );
     augment_type(&mut input.ty, &exclude);
     input.into_token_stream()
@@ -85,7 +85,7 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
 
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role),
+        parse_quote!('__r, __R: ::rumpsteak_aura::Role),
     );
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
@@ -105,15 +105,15 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
 
     let mut output = TokenStream::new();
     output.extend(quote! {
-        impl #impl_generics ::rumpsteak::FromState<'__r> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak_aura::FromState<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
 
-            fn from_state(state: ::rumpsteak::State<'__r, Self::Role>) -> Self {
-                Self { #field_ident: ::rumpsteak::FromState::from_state(state) }
+            fn from_state(state: ::rumpsteak_aura::State<'__r, Self::Role>) -> Self {
+                Self { #field_ident: ::rumpsteak_aura::FromState::from_state(state) }
             }
         }
 
-        impl #impl_generics ::rumpsteak::IntoSession<'__r> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak_aura::IntoSession<'__r> for #ident #ty_generics #where_clause {
             type Session = #field_ty;
 
             fn into_session(self) -> Self::Session {
@@ -128,9 +128,9 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
         where_clause.predicates.push(parse_quote!(Self: 'static));
 
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::serialize::Serialize for #ident #ty_generics #where_clause {
-                fn serialize(s: &mut ::rumpsteak::serialize::Serializer) {
-                    <#field_ty as ::rumpsteak::serialize::Serialize>::serialize(s);
+            impl #impl_generics ::rumpsteak_aura::serialize::Serialize for #ident #ty_generics #where_clause {
+                fn serialize(s: &mut ::rumpsteak_aura::serialize::Serializer) {
+                    <#field_ty as ::rumpsteak_aura::serialize::Serialize>::serialize(s);
                 }
             }
         });
@@ -151,14 +151,14 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, '__r, __R: ::rumpsteak::Role + '__r),
+        parse_quote!('__q, '__r, __R: ::rumpsteak_aura::Role + '__r),
     );
     let (impl_generics, _, _) = generics.split_for_impl();
 
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, __R: ::rumpsteak::Role),
+        parse_quote!('__q, __R: ::rumpsteak_aura::Role),
     );
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -191,7 +191,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     let mut output = TokenStream::new();
     for (label, ty) in labels.iter().zip(&tys) {
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::Choice<'__r, #label> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak_aura::Choice<'__r, #label> for #ident #ty_generics #where_clause {
                 type Session = #ty;
             }
         });
@@ -199,7 +199,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
 
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role),
+        parse_quote!('__r, __R: ::rumpsteak_aura::Role),
     );
     let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
 
@@ -209,8 +209,8 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
         where_clause.predicates.push(parse_quote!(Self: 'static));
 
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::serialize::SerializeChoices for #ident #ty_generics #where_clause {
-                fn serialize_choices(mut s: ::rumpsteak::serialize::ChoicesSerializer<'_>) {
+            impl #impl_generics ::rumpsteak_aura::serialize::SerializeChoices for #ident #ty_generics #where_clause {
+                fn serialize_choices(mut s: ::rumpsteak_aura::serialize::ChoicesSerializer<'_>) {
                     #(s.serialize_choice::<#labels, #tys>();)*
                 }
             }
@@ -219,23 +219,23 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
 
     let mut generics = input.generics.clone();
     generics.make_where_clause().predicates.push(parse_quote! {
-        __R::Message: #(::rumpsteak::Message<#labels> +)*
+        __R::Message: #(::rumpsteak_aura::Message<#labels> +)*
     });
 
     let (_, _, where_clause) = generics.split_for_impl();
     output.extend(quote! {
-        impl #impl_generics ::rumpsteak::Choices<'__r> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak_aura::Choices<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
 
             fn downcast(
-                state: ::rumpsteak::State<'__r, Self::Role>,
+                state: ::rumpsteak_aura::State<'__r, Self::Role>,
                 message: <Self::Role as Role>::Message,
             ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
-                #(let message = match ::rumpsteak::Message::downcast(message) {
+                #(let message = match ::rumpsteak_aura::Message::downcast(message) {
                     Ok(label) => {
                         return Ok(Self::#idents(
                             label,
-                            ::rumpsteak::FromState::from_state(state)
+                            ::rumpsteak_aura::FromState::from_state(state)
                         ));
                     }
                     Err(message) => message

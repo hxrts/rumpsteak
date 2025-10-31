@@ -1,1 +1,0 @@
-Running examples/simple_auth/simple_auth.rs

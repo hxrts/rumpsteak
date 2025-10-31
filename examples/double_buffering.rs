@@ -3,7 +3,7 @@ use futures::{
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::{Bidirectional, Nil},
     session, try_session, End, Message, Receive, Role, Roles, Send,
 };

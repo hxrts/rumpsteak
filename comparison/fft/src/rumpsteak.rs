@@ -1,6 +1,6 @@
 use futures::{channel::oneshot, try_join, Future, Sink, Stream};
 use num_complex::Complex32;
-use rumpsteak::{
+use rumpsteak_aura::{
     channel::{Bidirectional, Nil, Pair},
     session, try_session, End, Message, Receive, Role, Roles, Send,
 };

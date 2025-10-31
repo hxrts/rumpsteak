@@ -20,7 +20,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, HeaderMap, Server, StatusCode,
 };
-use rumpsteak::{channel::Bidirectional, Roles};
+use rumpsteak_aura::{channel::Bidirectional, Roles};
 use serde::{Deserialize, Serialize};
 use std::{
     any::Any,

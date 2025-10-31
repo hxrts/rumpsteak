@@ -5,6 +5,7 @@ mod parse;
 mod role;
 mod roles;
 mod session;
+mod choreography;
 
 #[proc_macro_derive(Message)]
 pub fn message(input: TokenStream) -> TokenStream {
@@ -30,6 +31,13 @@ pub fn roles(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
     session::session(attr.into(), input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+#[proc_macro]
+pub fn choreography(input: TokenStream) -> TokenStream {
+    choreography::choreography(input.into())
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

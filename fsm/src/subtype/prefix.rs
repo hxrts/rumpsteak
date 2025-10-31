@@ -109,7 +109,9 @@ impl<'a, R, N> Prefix<'a, R, N> {
         &self,
     ) -> impl Iterator<Item = (Index, &TransitionRef<'a, R, N, Infallible>)> {
         let prefixes = self.transitions.iter().enumerate().skip(self.start);
-        prefixes.filter_map(|(i, (removed, transition))| (!removed).then(|| (Index(i), transition)))
+        prefixes
+            .filter(|&(_, (removed, _))| !removed)
+            .map(|(i, (_, transition))| (Index(i), transition))
     }
 
     pub(super) fn iter(&self) -> impl Iterator<Item = &TransitionRef<'a, R, N, Infallible>> {
