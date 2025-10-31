@@ -1,3 +1,8 @@
+//! Implementation of the `#[session]` attribute macro.
+//!
+//! Transforms session type definitions by adding lifetime parameters and
+//! generating trait implementations for working with session types.
+
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::{collections::HashSet, mem};
@@ -6,6 +11,7 @@ use syn::{
     GenericParam, Ident, Index, Item, ItemEnum, ItemStruct, ItemType, PathArguments, Result, Type,
 };
 
+/// Extracts type parameter identifiers from generic parameters.
 fn idents_set<P>(params: &Punctuated<GenericParam, P>) -> HashSet<Ident> {
     let idents = params.iter().filter_map(|param| match param {
         GenericParam::Type(ty) => Some(ty.ident.clone()),
@@ -14,11 +20,13 @@ fn idents_set<P>(params: &Punctuated<GenericParam, P>) -> HashSet<Ident> {
     idents.collect::<HashSet<_>>()
 }
 
+/// Prepends items from `right` to `left` in a punctuated list.
 fn punctuated_prepend<T, P: Default>(left: &mut Punctuated<T, P>, mut right: Punctuated<T, P>) {
     right.extend(mem::take(left));
     *left = right;
 }
 
+/// Unwraps grouped or parenthesized types to get the inner type.
 fn unroll_type(mut ty: &mut Type) -> &mut Type {
     loop {
         ty = match ty {
@@ -31,6 +39,10 @@ fn unroll_type(mut ty: &mut Type) -> &mut Type {
     ty
 }
 
+/// Augments a type with lifetime and role parameters for session types.
+///
+/// Recursively adds `'__r` and `__R` parameters to session type constructors
+/// while excluding types that are already parameterized.
 fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
     while let Type::Path(path) = unroll_type(ty) {
         if *path == parse_quote!(Self) {
@@ -69,6 +81,7 @@ fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
     }
 }
 
+/// Transforms a type alias into a session type with lifetime parameters.
 fn session_type(mut input: ItemType) -> TokenStream {
     let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
@@ -79,6 +92,7 @@ fn session_type(mut input: ItemType) -> TokenStream {
     input.into_token_stream()
 }
 
+/// Transforms a struct into a session type with necessary trait implementations.
 fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     let ident = &input.ident;
     let exclude = idents_set(&input.generics.params);
@@ -139,6 +153,7 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     Ok(quote!(#input #output))
 }
 
+/// Transforms an enum into a choice type with necessary trait implementations.
 fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     if input.variants.is_empty() {
         let message = "expected at least one variant";
@@ -249,6 +264,10 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     Ok(quote!(#input #output))
 }
 
+/// Main entry point for the `#[session]` attribute macro.
+///
+/// Handles type aliases, structs, and enums, transforming them into
+/// session types with appropriate trait implementations.
 pub fn session(attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
     let Nothing = parse2(attr)?;
     match parse2::<Item>(input)? {

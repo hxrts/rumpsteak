@@ -1,3 +1,8 @@
+//! Proxy role implementation.
+//!
+//! The proxy role coordinates between the client, cache, and origin server
+//! to implement HTTP caching with ETag support.
+
 use crate::{
     cache::{Cache, Load, Lock, Locked, Remove, Store, Unlock},
     client::Client,
@@ -10,6 +15,7 @@ use serde::Serialize;
 use std::{any::Any, marker};
 use tracing::{debug, error};
 
+/// The proxy role that coordinates caching logic.
 #[derive(Role)]
 #[message(Box<dyn Any + marker::Send>)]
 pub struct Proxy {
@@ -31,12 +37,16 @@ type Forward = Send<Origin, Request, Receive<Origin, Response, Send<Client, Resp
 
 #[session]
 enum Choice {
+    #[allow(dead_code)] // Reserved for caching protocol operations
     Store(Store, Select<Cache, Self>),
+    #[allow(dead_code)] // Reserved for caching protocol operations
     Remove(Remove, Select<Cache, Self>),
     Unlock(Unlock, End),
 }
 
+/// Cache key structure based on HTTP request attributes.
 #[derive(Serialize)]
+#[allow(dead_code)] // Used for HTTP caching key serialization
 struct Key<'a> {
     #[serde(with = "http_serde::method")]
     method: &'a Method,
@@ -45,6 +55,9 @@ struct Key<'a> {
     headers: Vec<Option<&'a [u8]>>,
 }
 
+/// Forwards a request to origin and handles caching logic.
+///
+/// Implements ETag-based conditional requests and cache storage.
 async fn respond(
     request: Request,
     cached: Option<Response>,
@@ -107,6 +120,9 @@ async fn try_run(role: &mut Proxy, headers: &[String]) -> Result<()> {
     .await
 }
 
+/// Runs the proxy role protocol.
+///
+/// Coordinates between client, cache, and origin to implement HTTP caching.
 pub async fn run(role: &mut Proxy, headers: &[String]) -> Result<()> {
     let result = try_run(role, headers).await;
     if let Err(err) = &result {

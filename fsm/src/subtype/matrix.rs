@@ -1,15 +1,21 @@
+//! Two-dimensional matrix data structure for subtyping algorithm.
+
 use super::pair::Pair;
 use std::{
     fmt::{self, Debug, Formatter},
     ops::{Index, IndexMut},
 };
 
+/// A 2D matrix indexed by pairs of coordinates.
+///
+/// Used to track visited state pairs during subtyping verification.
 pub struct Matrix<T> {
     dimensions: Pair<usize>,
     slice: Box<[T]>,
 }
 
 impl<T> Matrix<T> {
+    /// Creates a new matrix with the given dimensions filled with clones of `value`.
     pub fn new(dimensions: Pair<usize>, value: T) -> Self
     where
         T: Clone,

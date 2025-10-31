@@ -1,11 +1,11 @@
 [package]
 name = "rumpsteak-fsm"
-version = "0.1.0"
+version = "0.1.1-aura"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
-edition = "2018"
-description = "Session types for asynchronous communication between multiple parties."
+edition = "2021"
+description = "Session types for asynchronous communication between multiple parties (Aura flavored)."
 readme = "README.md"
-repository = "https://github.com/zakcutner/rumpsteak"
+repository = "https://github.com/aura-project/rumpsteak-aura"
 license = "MIT"
 keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]
@@ -24,7 +24,10 @@ logos = { version = "0.12", optional = true }
 memchr = { version = "2.4", optional = true }
 petgraph = "0.6"
 termcolor = { version = "1.1", optional = true }
-thiserror = "1.0"
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
 
 [features]
 parsing = ["bitvec", "codespan-reporting", "logos", "memchr"]

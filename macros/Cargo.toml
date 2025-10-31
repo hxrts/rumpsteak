@@ -1,11 +1,11 @@
 [package]
 name = "rumpsteak-macros"
-version = "0.1.0"
+version = "0.1.1-aura"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
-edition = "2018"
-description = "Session types for asynchronous communication between multiple parties."
+edition = "2021"
+description = "Procedural macros for Rumpsteak session types (Aura flavored)."
 readme = "../README.md"
-repository = "https://github.com/zakcutner/rumpsteak"
+repository = "https://github.com/aura-project/rumpsteak-aura"
 license = "MIT"
 keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]
@@ -14,9 +14,9 @@ categories = ["asynchronous", "concurrency"]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "2.0", features = ["extra-traits", "full", "parsing"] }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["parsing"] }
 
 [features]
 serialize = []

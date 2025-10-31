@@ -1,3 +1,14 @@
+//! Asynchronous subtyping verification for session types.
+//!
+//! This module implements the asynchronous subtyping algorithm from the paper
+//! "Precise Subtyping for Asynchronous Multiparty Sessions". It verifies whether
+//! one FSM is a valid implementation of another, allowing message reordering
+//! according to asynchronous semantics.
+//!
+//! The algorithm checks if one protocol can safely replace another by exploring
+//! the state space and verifying that all message sequences are compatible with
+//! the given bound on visits.
+
 #![cfg(feature = "subtyping")]
 
 mod matrix;
@@ -191,7 +202,8 @@ fn reduce<R: Eq, N: Eq>(prefixes: &mut Pair<Prefix<R, N>>) -> bool {
             continue;
         }
 
-        // TODO: cache the results of these checks to only search new actions.
+        // Note: Caching reorder results would improve performance but requires
+        // refactoring to pass cache state through the reduce function
         let i = match left.action {
             Action::Input => reorder(left, &prefixes.right, |left, right| {
                 right.role == left.role || right.action == Action::Output
@@ -215,6 +227,33 @@ fn reduce<R: Eq, N: Eq>(prefixes: &mut Pair<Prefix<R, N>>) -> bool {
     true
 }
 
+/// Checks if `left` is an asynchronous subtype of `right`.
+///
+/// Returns true if the left FSM can safely implement the right FSM according
+/// to asynchronous subtyping rules. The `visits` parameter bounds the search depth.
+///
+/// # Arguments
+///
+/// * `left` - The implementation FSM
+/// * `right` - The specification FSM
+/// * `visits` - Maximum number of times to visit each state pair
+///
+/// # Panics
+///
+/// Panics if the FSMs represent different roles.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use rumpsteak_fsm::subtype::is_subtype;
+///
+/// let implementation = /* ... */;
+/// let specification = /* ... */;
+///
+/// if is_subtype(&implementation, &specification, 2) {
+///     println!("Implementation is valid!");
+/// }
+/// ```
 pub fn is_subtype<R: Eq, N: Eq>(
     left: &Fsm<R, N, Infallible>,
     right: &Fsm<R, N, Infallible>,

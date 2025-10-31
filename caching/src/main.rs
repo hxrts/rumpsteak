@@ -1,3 +1,14 @@
+//! HTTP caching proxy using session types and Redis.
+//!
+//! This is a case study demonstrating Rumpsteak's session types for implementing
+//! an HTTP caching proxy. The proxy uses session types to coordinate between:
+//! - Client: Receives HTTP requests
+//! - Proxy: Coordinates caching logic
+//! - Cache: Manages Redis-backed cache storage
+//! - Origin: Forwards requests to upstream server
+//!
+//! The implementation ensures deadlock-free communication and type-safe protocols.
+
 mod cache;
 mod client;
 mod origin;
@@ -38,11 +49,14 @@ const DEFAULT_HEADERS: &[&str] = &["Cookie", "Host"];
 
 type Result<T, E = Box<dyn Error + Send + Sync>> = result::Result<T, E>;
 
+/// Type alias for bidirectional channels used in session types.
 type Channel =
     Bidirectional<UnboundedSender<Box<dyn Any + Send>>, UnboundedReceiver<Box<dyn Any + Send>>>;
 
+/// Type alias for HTTP requests.
 type Request = hyper::Request<Body>;
 
+/// Wrapper to make external error types implement `std::error::Error`.
 struct ErrorWrapper<E>(E);
 
 impl<E: Debug> Debug for ErrorWrapper<E> {
@@ -59,10 +73,12 @@ impl<E: Display> Display for ErrorWrapper<E> {
 
 impl<E: Debug + Display> Error for ErrorWrapper<E> {}
 
+/// Wraps a result with our custom error wrapper.
 fn wrap<T, E: Debug + Display>(result: Result<T, E>) -> Result<T, ErrorWrapper<E>> {
     result.map_err(ErrorWrapper)
 }
 
+/// Container for all protocol roles.
 #[derive(Roles)]
 struct Roles {
     client: Client,
@@ -71,6 +87,9 @@ struct Roles {
     origin: Origin,
 }
 
+/// Serializable HTTP response representation.
+///
+/// Used for storing responses in the Redis cache.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct Response {
     #[serde(with = "http_serde::status_code")]
@@ -81,6 +100,7 @@ struct Response {
 }
 
 impl Response {
+    /// Creates a serializable response from a Hyper response.
     async fn new(response: hyper::Response<Body>) -> hyper::Result<Self> {
         let (head, body) = response.into_parts();
         Ok(Self {
@@ -90,6 +110,7 @@ impl Response {
         })
     }
 
+    /// Converts back to a Hyper response.
     fn into_response(self) -> hyper::Response<Body> {
         let mut response = hyper::Response::new(self.body.into());
         *response.status_mut() = self.status;
@@ -98,12 +119,16 @@ impl Response {
     }
 }
 
+/// A cached response entry with its ETag.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Entry {
     etag: Vec<u8>,
     response: Response,
 }
 
+/// Command-line options for the HTTP caching proxy.
+///
+/// Configured using the argh crate for command-line parsing.
 #[derive(FromArgs)]
 /// An HTTP cache backed by session types.
 struct Options {
@@ -129,6 +154,7 @@ struct Options {
     remote: Authority,
 }
 
+/// Shared context passed to all protocol roles.
 #[derive(Clone)]
 struct Context {
     headers: Vec<String>,
@@ -137,6 +163,7 @@ struct Context {
     hyper: hyper::Client<HttpConnector>,
 }
 
+/// Spawns a future on the Tokio runtime and awaits its result.
 async fn spawn<T: Send + 'static, F>(f: F) -> Result<T>
 where
     F: Future<Output = Result<T>> + Send + 'static,
@@ -144,6 +171,9 @@ where
     tokio::spawn(f).await?
 }
 
+/// Handles an HTTP request by coordinating all protocol roles.
+///
+/// Creates fresh role instances for each request and spawns their session handlers.
 async fn handler(
     context: Arc<Context>,
     request: hyper::Request<Body>,
@@ -174,6 +204,7 @@ async fn handler(
     Ok(response)
 }
 
+/// Main application entry point (fallible version).
 async fn try_main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let mut options = argh::from_env::<Options>();

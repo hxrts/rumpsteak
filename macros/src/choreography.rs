@@ -1,11 +1,24 @@
-// Procedural macro for choreographic protocol definitions
+//! Choreographic protocol definition macro implementation.
+//!
+//! This module provides the implementation of the `choreography!` macro,
+//! which allows defining multiparty protocols from a global viewpoint.
+
 use proc_macro2::{TokenStream, Ident};
 use quote::quote;
-use syn::{Error, Result, parse::{Parse, ParseStream}, Token, braced, parenthesized};
+use syn::{Error, Result, parse::{Parse, ParseStream}, Token, braced, parenthesized, LitStr};
 
-/// Main entry point for the choreography! macro
+/// Main entry point for the choreography! macro.
+///
+/// Parses choreographic protocol definitions and generates Rust code including
+/// roles, messages, and session types.
 pub fn choreography(input: TokenStream) -> Result<TokenStream> {
-    // Parse the choreography DSL
+    // First, try to parse as a string literal (for inline DSL)
+    if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
+        // Use the DSL parser
+        return choreography_from_dsl_string(lit_str.value());
+    }
+    
+    // Otherwise, fall back to syn-based parsing
     let protocol: ProtocolDef = syn::parse2(input)?;
     
     // Generate role structs
@@ -35,6 +48,20 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
     })
 }
 
+/// Parse choreography from DSL string
+fn choreography_from_dsl_string(_dsl: String) -> Result<TokenStream> {
+    // This is a placeholder implementation
+    // In a full implementation, this would:
+    // 1. Use the choreography parser from rumpsteak-choreography
+    // 2. Project to local types for each role
+    // 3. Generate code for the session types
+    // For now, we'll return a compile-time note
+    
+    Ok(quote! {
+        compile_error!("Full DSL parser integration is planned. For now, use the explicit syntax without string literals.");
+    })
+}
+
 /// Protocol definition from the DSL
 struct ProtocolDef {
     name: Ident,
@@ -45,8 +72,11 @@ struct ProtocolDef {
 /// Role definition
 struct RoleDef {
     name: Ident,
+    /// Parameters for parameterized roles like Worker[N]
+    ///
+    /// Reserved for future implementation of parameterized roles.
     #[allow(dead_code)]
-    params: Option<syn::Expr>, // For parameterized roles like Worker[N]
+    params: Option<syn::Expr>,
 }
 
 /// Protocol interaction
@@ -57,6 +87,10 @@ enum Interaction {
         message: Ident,
         payload: Box<Option<syn::Type>>,
     },
+    /// Choice interaction
+    ///
+    /// Reserved for future macro-level choice syntax.
+    /// Currently choices are generated through code generation, not parsed from macro syntax.
     #[allow(dead_code)]
     Choice {
         role: Ident,
@@ -64,6 +98,9 @@ enum Interaction {
     },
 }
 
+/// Branch in a choice interaction
+///
+/// Reserved for future macro-level choice syntax.
 #[allow(dead_code)]
 struct ChoiceBranch {
     label: Ident,
@@ -271,8 +308,79 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
                 }
                 // Otherwise, this role doesn't participate
             }
-            Interaction::Choice { .. } => {
-                // Simplified for now - full implementation would handle choices
+            Interaction::Choice { role: choosing_role, branches } => {
+                // Handle choice: the choosing role offers branches, others receive the choice
+                if choosing_role == &role.name {
+                    // This role makes the choice
+                    // Generate: Choose<Label1, S1> + Choose<Label2, S2> + ...
+                    let branch_types: Vec<TokenStream> = branches.iter().map(|branch| {
+                        let label = &branch.label;
+                        // Project each branch's interactions for this role
+                        let mut branch_type = type_expr.clone();
+                        for branch_interaction in branch.interactions.iter().rev() {
+                            match branch_interaction {
+                                Interaction::Send { from, to, message, .. } => {
+                                    if from == &role.name {
+                                        branch_type = quote! {
+                                            ::rumpsteak_aura::Send<#to, #message, #branch_type>
+                                        };
+                                    } else if to == &role.name {
+                                        branch_type = quote! {
+                                            ::rumpsteak_aura::Receive<#from, #message, #branch_type>
+                                        };
+                                    }
+                                }
+                                Interaction::Choice { .. } => {
+                                    // Nested choices - recursively handle
+                                }
+                            }
+                        }
+                        quote! { ::rumpsteak_aura::Choose<#label, #branch_type> }
+                    }).collect();
+                    
+                    // Combine branches into a choice type (sum type)
+                    if !branch_types.is_empty() {
+                        type_expr = branch_types.into_iter().fold(None, |acc, branch| {
+                            match acc {
+                                None => Some(branch),
+                                Some(prev) => Some(quote! { ::rumpsteak_aura::Branch<#prev, #branch> }),
+                            }
+                        }).unwrap();
+                    }
+                } else {
+                    // This role offers (receives the choice from choosing_role)
+                    // Generate: Offer<Role, { Label1 => S1, Label2 => S2, ... }>
+                    let branch_types: Vec<TokenStream> = branches.iter().map(|branch| {
+                        let label = &branch.label;
+                        // Project each branch's interactions for this role
+                        let mut branch_type = type_expr.clone();
+                        for branch_interaction in branch.interactions.iter().rev() {
+                            match branch_interaction {
+                                Interaction::Send { from, to, message, .. } => {
+                                    if from == &role.name {
+                                        branch_type = quote! {
+                                            ::rumpsteak_aura::Send<#to, #message, #branch_type>
+                                        };
+                                    } else if to == &role.name {
+                                        branch_type = quote! {
+                                            ::rumpsteak_aura::Receive<#from, #message, #branch_type>
+                                        };
+                                    }
+                                }
+                                Interaction::Choice { .. } => {
+                                    // Nested choices - recursively handle
+                                }
+                            }
+                        }
+                        quote! { #label => #branch_type }
+                    }).collect();
+                    
+                    if !branch_types.is_empty() {
+                        type_expr = quote! {
+                            ::rumpsteak_aura::Offer<#choosing_role, { #(#branch_types),* }>
+                        };
+                    }
+                }
             }
         }
     }

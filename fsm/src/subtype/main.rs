@@ -104,22 +104,30 @@ fn main() {
         let right = unwrap_fsm(right, &options.right);
 
         let is_subtype = subtype::is_subtype(&left, &right, options.visits);
-        write!(&mut stdout, "{}. left ", i + 1).unwrap();
+        write!(&mut stdout, "{}. left ", i + 1)
+            .expect("failed to write to stdout");
 
         match is_subtype {
             true => {
-                set_color(&mut stdout, Color::Green).unwrap();
-                write!(&mut stdout, "IS").unwrap();
+                set_color(&mut stdout, Color::Green)
+                    .expect("failed to set color");
+                write!(&mut stdout, "IS")
+                    .expect("failed to write to stdout");
             }
             false => {
-                set_color(&mut stdout, Color::Red).unwrap();
-                write!(&mut stdout, "IS NOT").unwrap();
+                set_color(&mut stdout, Color::Red)
+                    .expect("failed to set color");
+                write!(&mut stdout, "IS NOT")
+                    .expect("failed to write to stdout");
             }
         }
 
-        stdout.reset().unwrap();
-        writeln!(&mut stdout, " a subtype of right").unwrap();
+        stdout.reset()
+            .expect("failed to reset stdout color");
+        writeln!(&mut stdout, " a subtype of right")
+            .expect("failed to write to stdout");
     }
 
-    writeln!(&mut stdout).unwrap();
+    writeln!(&mut stdout)
+        .expect("failed to write to stdout");
 }

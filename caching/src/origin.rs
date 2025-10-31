@@ -1,3 +1,7 @@
+//! Origin server role implementation.
+//!
+//! The origin role forwards requests to the upstream HTTP server.
+
 use crate::{cache::Cache, client::Client, proxy::Proxy, Channel, Request, Response, Result};
 use hyper::{
     client::{self, HttpConnector},
@@ -8,6 +12,7 @@ use rumpsteak_aura::{channel::Nil, session, try_session, End, Receive, Role, Sen
 use std::{any::Any, marker, mem};
 use tracing::error;
 
+/// The origin role that forwards requests to the upstream server.
 #[derive(Role)]
 #[message(Box<dyn Any + marker::Send>)]
 pub struct Origin {
@@ -22,6 +27,7 @@ pub struct Origin {
 #[session]
 type Session = Receive<Proxy, Request, Send<Proxy, Response, End>>;
 
+/// Sets the authority (host) for a URI.
 fn set_authority(uri: &mut Uri, authority: Authority) -> Result<()> {
     let old = mem::take(uri).into_parts();
     *uri = Uri::builder()
@@ -50,6 +56,9 @@ async fn try_run(
     .await
 }
 
+/// Runs the origin role protocol.
+///
+/// Receives requests from the proxy and forwards them to the upstream server.
 pub async fn run(
     role: &mut Origin,
     remote: Authority,
