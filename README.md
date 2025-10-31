@@ -144,7 +144,7 @@ Crate for procedural macros used within Rumpsteak's API.
 
 ## WebAssembly Support
 
-Rumpsteak now supports compilation to WebAssembly! The core session types and choreography system can run in browser environments. See `examples/wasm-ping-pong/` for a complete example and `docs/WASM_IMPLEMENTATION_SUMMARY.md` for implementation details.
+Rumpsteak supports compilation to WebAssembly. The core session types and choreography system can run in browser environments. See `examples/wasm-ping-pong/` for a complete example and `docs/07_wasm_guide.md` for implementation details.
 
 Key features:
 - Core session types compile to WASM

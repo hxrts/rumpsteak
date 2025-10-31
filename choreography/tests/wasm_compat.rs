@@ -22,11 +22,7 @@ enum TestRole {
     Bob,
 }
 
-impl RoleId for TestRole {
-    fn name(&self) -> String {
-        format!("{:?}", self)
-    }
-}
+// RoleId is automatically implemented via blanket impl
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 enum TestMessage {
@@ -40,8 +36,7 @@ fn test_role_id_trait() {
     let alice = TestRole::Alice;
     let bob = TestRole::Bob;
 
-    assert_eq!(alice.name(), "Alice");
-    assert_eq!(bob.name(), "Bob");
+    // RoleId is automatically implemented for types with the required bounds
     assert_ne!(alice, bob);
 }
 

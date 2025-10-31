@@ -250,7 +250,7 @@ Use middleware to add logging, metrics, retries, or fault injection to any handl
 
 ## WASM Considerations
 
-InMemoryHandler works in WASM environments. RumpsteakHandler requires native tokio and does not compile to WASM.
+InMemoryHandler and RumpsteakHandler both work in WASM environments using futures channels.
 
 For WASM network communication, implement a custom handler using web-sys WebSocket or fetch APIs. See `07_wasm_guide.md` for details.
 

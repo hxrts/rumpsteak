@@ -1,3 +1,8 @@
+// Channel abstractions for session-typed communication
+//
+// Provides bidirectional channels with Sink and Stream implementations,
+// and channel pairing utilities for session types.
+
 use crate::Sealable;
 use futures::{channel::mpsc, Sink, Stream};
 use std::{

@@ -24,9 +24,7 @@ pub use interpreter::interpret;
 
 // Re-export handler implementations for convenience
 pub use handlers::{InMemoryHandler, RecordedEvent, RecordingHandler};
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use handlers::{HasRoute, RumpsteakEndpoint, RumpsteakHandler};
+pub use handlers::{HasRoute, RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
 
 // Re-export middleware for convenience
 pub use middleware::{Metrics, Retry, Trace};

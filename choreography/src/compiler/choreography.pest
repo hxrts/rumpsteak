@@ -109,4 +109,3 @@ payload_content = { (!(")" | ",") ~ ANY)* ~ ("," ~ (!(")" | ",") ~ ANY)*)* }
 ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 integer = @{ ASCII_DIGIT+ }
 string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
-
