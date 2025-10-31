@@ -1,6 +1,6 @@
 // Static analysis for choreographic protocols
 
-use super::ast::{Choreography, Protocol, Role};
+use crate::ast::{Choreography, Protocol, Role};
 use std::collections::{HashMap, HashSet};
 
 /// Analysis results for a choreography
@@ -186,37 +186,37 @@ impl<'a> Analyzer<'a> {
         }
         
         // Analyze protocol for dependencies
-        self.extract_dependencies(&self.choreography.protocol, &mut dependencies);
+        Self::extract_dependencies(&self.choreography.protocol, &mut dependencies);
         
         // Check for cycles using DFS
         !has_cycle(&dependencies)
     }
     
-    fn extract_dependencies(&self, protocol: &Protocol, deps: &mut HashMap<Role, HashSet<Role>>) {
+    fn extract_dependencies(protocol: &Protocol, deps: &mut HashMap<Role, HashSet<Role>>) {
         match protocol {
             Protocol::Send { from, to, continuation, .. } => {
                 deps.get_mut(to).unwrap().insert(from.clone());
-                self.extract_dependencies(continuation, deps);
+                Self::extract_dependencies(continuation, deps);
             }
             Protocol::Choice { branches, .. } => {
                 for branch in branches {
-                    self.extract_dependencies(&branch.protocol, deps);
+                    Self::extract_dependencies(&branch.protocol, deps);
                 }
             }
             Protocol::Loop { body, .. } => {
-                self.extract_dependencies(body, deps);
+                Self::extract_dependencies(body, deps);
             }
             Protocol::Parallel { protocols } => {
                 // Parallel branches don't create dependencies between them
                 for p in protocols {
-                    self.extract_dependencies(p, deps);
+                    Self::extract_dependencies(p, deps);
                 }
             }
             Protocol::Rec { body, .. } => {
-                self.extract_dependencies(body, deps);
+                Self::extract_dependencies(body, deps);
             }
             Protocol::Broadcast { continuation, .. } => {
-                self.extract_dependencies(continuation, deps);
+                Self::extract_dependencies(continuation, deps);
             }
             Protocol::Var(_) | Protocol::End => {}
         }
@@ -224,26 +224,26 @@ impl<'a> Analyzer<'a> {
     
     fn check_progress(&self) -> bool {
         // Check that the protocol eventually terminates or makes progress
-        self.check_protocol_progress(&self.choreography.protocol)
+        Self::check_protocol_progress(&self.choreography.protocol)
     }
     
-    fn check_protocol_progress(&self, protocol: &Protocol) -> bool {
+    fn check_protocol_progress(protocol: &Protocol) -> bool {
         match protocol {
             Protocol::End => true,
             Protocol::Send { continuation, .. } => {
                 // Send is progress
-                self.check_protocol_progress(continuation)
+                Self::check_protocol_progress(continuation)
             }
             Protocol::Choice { branches, .. } => {
                 // All branches must have progress
-                branches.iter().all(|b| self.check_protocol_progress(&b.protocol))
+                branches.iter().all(|b| Self::check_protocol_progress(&b.protocol))
             }
             Protocol::Loop { body, .. } => {
                 // Check that loop body has communication (progress)
                 has_communication(body)
             }
             Protocol::Parallel { protocols } => {
-                protocols.iter().all(|p| self.check_protocol_progress(p))
+                protocols.iter().all(Self::check_protocol_progress)
             }
             Protocol::Rec { body, .. } => {
                 // Recursive protocols must have communication
@@ -251,7 +251,7 @@ impl<'a> Analyzer<'a> {
             }
             Protocol::Var(_) => true, // Assume recursive calls are okay
             Protocol::Broadcast { continuation, .. } => {
-                self.check_protocol_progress(continuation)
+                Self::check_protocol_progress(continuation)
             }
         }
     }
@@ -279,11 +279,10 @@ fn has_cycle(graph: &HashMap<Role, HashSet<Role>>) -> bool {
     let mut rec_stack = HashSet::new();
     
     for node in graph.keys() {
-        if !visited.contains(node) {
-            if dfs_cycle(node, graph, &mut visited, &mut rec_stack) {
+        if !visited.contains(node) 
+            && dfs_cycle(node, graph, &mut visited, &mut rec_stack) {
                 return true;
             }
-        }
     }
     
     false

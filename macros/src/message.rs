@@ -40,7 +40,7 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
             (Some(field), None) => Ok(field),
             _ => {
                 let message = "expected exactly one field per variant";
-                Err(Error::new_spanned(&fields, message))
+                Err(Error::new_spanned(fields, message))
             }
         }?;
 

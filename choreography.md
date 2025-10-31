@@ -82,24 +82,36 @@ rec X {
 
 ### 3. Implementation Structure
 
-The choreography system is organized into distinct modules that separate concerns between parsing, analysis, projection, and code generation. This modular architecture enables clean separation of the compilation pipeline stages and facilitates future extensions to the choreography system.
+The choreographic programming system is now implemented as a separate crate (`rumpsteak-choreography`) that provides a clean layer on top of the core Rumpsteak session types. The system is organized into distinct modules that separate concerns and enable clean architecture.
 
 ```rust
-// New module structure
-pub mod choreography {
-    pub mod ast;        // Choreography AST types
-    pub mod parser;     // Parse choreography DSL
-    pub mod projection; // Project to local types
-    pub mod codegen;    // Generate session types
-    pub mod analysis;   // Static analysis
-}
+// Crate structure
+rumpsteak-choreography/
+├── src/
+│   ├── lib.rs          // Public API
+│   ├── ast/            // AST and language constructs
+│   │   ├── mod.rs      // Core types: Choreography, Protocol, Role
+│   │   ├── protocol.rs // Protocol-specific extensions
+│   │   └── role.rs     // Role and message type utilities
+│   ├── compiler/       // Compilation pipeline
+│   │   ├── mod.rs
+│   │   ├── parser.rs   // Parse choreography DSL
+│   │   ├── analysis.rs // Static analysis
+│   │   ├── projection.rs // Project to local types
+│   │   ├── codegen.rs  // Generate session types
+│   │   └── effects_codegen.rs // Generate effect-based code
+│   └── effects/        // Effect system
+│       ├── mod.rs
+│       ├── handler.rs  // Core effect traits
+│       ├── middleware.rs // Composable middleware (Trace, Metrics, Retry)
+│       └── impls.rs    // Handler implementations (Rumpsteak, InMemory, Recording)
 ```
 
 ### 4. Key Components
 
-This section details the core data structures and algorithms that power the choreographic system. Each component plays a crucial role in transforming global choreographies into executable session-typed code while preserving correctness guarantees.
+Each component below plays a role in transforming global choreographies into executable session-typed code while preserving correctness guarantees.
 
-#### a. Choreography AST (`choreography/ast.rs`)
+#### a. Choreography AST (`rumpsteak-choreography/src/ast/mod.rs`)
 ```rust
 #[derive(Debug, Clone)]
 pub struct Choreography {
@@ -134,7 +146,7 @@ pub enum Protocol {
 }
 ```
 
-#### b. Projection Algorithm (`choreography/projection.rs`)
+#### b. Projection Algorithm (`rumpsteak-choreography/src/compiler/projection.rs`)
 ```rust
 pub fn project(choreography: &Choreography, role: &Role) -> LocalType {
     match &choreography.protocol {
@@ -160,7 +172,7 @@ pub fn project(choreography: &Choreography, role: &Role) -> LocalType {
 }
 ```
 
-#### c. Code Generation (`choreography/codegen.rs`)
+#### c. Code Generation (`rumpsteak-choreography/src/compiler/codegen.rs`)
 ```rust
 pub fn generate_session_types(choreography: &Choreography) -> TokenStream {
     let mut types = TokenStream::new();
@@ -260,3 +272,87 @@ The choreography system includes static analysis capabilities to verify protocol
 #### c. Role Coverage
 - Ensure all roles participate meaningfully
 - Detect unused roles
+
+### 8. Effect Handler Architecture
+
+The choreographic system now includes an effect handler abstraction that decouples protocol logic from transport implementation. This clean separation enables testable, composable, and runtime-agnostic protocol implementations while maintaining the choreographic programming model.
+
+#### a. Effect Handler Trait (`rumpsteak-choreography/src/effects/handler.rs`)
+```rust
+#[async_trait]
+pub trait ChoreoHandler: Send {
+    type Role: RoleId;
+    type Endpoint: Endpoint;
+
+    async fn send<M: Serialize + Send + Sync>(
+        &mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M
+    ) -> Result<()>;
+
+    async fn recv<M: DeserializeOwned + Send>(
+        &mut self, ep: &mut Self::Endpoint, from: Self::Role
+    ) -> Result<M>;
+
+    async fn choose(
+        &mut self, ep: &mut Self::Endpoint, who: Self::Role, label: Label
+    ) -> Result<()>;
+
+    async fn offer(
+        &mut self, ep: &mut Self::Endpoint, from: Self::Role
+    ) -> Result<Label>;
+}
+```
+
+#### b. Composable Middleware (`rumpsteak-choreography/src/effects/middleware.rs`)
+```rust
+// Tracing middleware for observability
+pub struct Trace<H> {
+    inner: H,
+    prefix: String,
+}
+
+// Metrics collection middleware
+pub struct Metrics<H> {
+    inner: H,
+    send_count: AtomicU64,
+    recv_count: AtomicU64,
+}
+
+// Retry middleware with exponential backoff
+pub struct Retry<H> {
+    inner: H,
+    max_retries: usize,
+    base_delay: Duration,
+}
+```
+
+#### c. Multiple Transport Implementations (`rumpsteak-choreography/src/effects/impls.rs`)
+```rust
+// Production: Rumpsteak session-typed channels
+pub struct RumpsteakHandler<R, M> { ... }
+
+// Testing: In-memory channels
+pub struct InMemoryHandler<R: RoleId> { ... }
+
+// Verification: Event recording for testing
+pub struct RecordingHandler<R: RoleId> { ... }
+
+// Stub: No-op for pure logic testing
+pub struct NoOpHandler<R: RoleId> { ... }
+```
+
+#### d. Generated Protocol Code (`rumpsteak-choreography/src/compiler/effects_codegen.rs`)
+```rust
+// Generated from choreography - uses effect handlers
+pub async fn run_client<H: ChoreoHandler<Role = Role, Endpoint = ClientEndpoint>>(
+    handler: &mut H,
+    endpoint: &mut ClientEndpoint,
+) -> Result<()> {
+    // Send request
+    handler.send(endpoint, Role::Server, &Request("hello".into())).await?;
+    
+    // Receive response
+    let response: Response = handler.recv(endpoint, Role::Server).await?;
+    
+    Ok(())
+}
+```

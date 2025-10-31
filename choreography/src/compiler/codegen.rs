@@ -1,6 +1,6 @@
 // Code generation from projected local types to Rumpsteak session types
 
-use super::ast::{LocalType, Role, MessageType};
+use crate::ast::{LocalType, Role, MessageType};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 

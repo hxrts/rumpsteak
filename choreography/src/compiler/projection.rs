@@ -1,6 +1,6 @@
 // Projection from global choreographies to local session types
 
-use super::ast::{Choreography, Protocol, Role, LocalType, MessageType, Branch};
+use crate::ast::{Choreography, Protocol, Role, LocalType, MessageType, Branch};
 use std::collections::HashMap;
 
 /// Project a choreography to a local session type for a specific role
@@ -27,8 +27,10 @@ pub enum ProjectionError {
 
 /// Context for projection algorithm
 struct ProjectionContext<'a> {
+    #[allow(dead_code)]
     choreography: &'a Choreography,
     role: &'a Role,
+    #[allow(dead_code)]
     rec_env: HashMap<String, LocalType>,
 }
 

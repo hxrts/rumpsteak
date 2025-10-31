@@ -45,6 +45,7 @@ struct ProtocolDef {
 /// Role definition
 struct RoleDef {
     name: Ident,
+    #[allow(dead_code)]
     params: Option<syn::Expr>, // For parameterized roles like Worker[N]
 }
 
@@ -54,14 +55,16 @@ enum Interaction {
         from: Ident,
         to: Ident,
         message: Ident,
-        payload: Option<syn::Type>,
+        payload: Box<Option<syn::Type>>,
     },
+    #[allow(dead_code)]
     Choice {
         role: Ident,
         branches: Vec<ChoiceBranch>,
     },
 }
 
+#[allow(dead_code)]
 struct ChoiceBranch {
     label: Ident,
     interactions: Vec<Interaction>,
@@ -129,9 +132,9 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
         let payload = if input.peek(syn::token::Paren) {
             let content;
             parenthesized!(content in input);
-            Some(content.parse()?)
+            Box::new(Some(content.parse()?))
         } else {
-            None
+            Box::new(None)
         };
         
         let _: Token![;] = input.parse()?;
@@ -196,7 +199,7 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
     // Extract messages from interactions
     for interaction in &protocol.interactions {
         if let Interaction::Send { message, payload, .. } = interaction {
-            messages.push((message, payload.as_ref()));
+            messages.push((message, payload.as_ref().as_ref()));
         }
     }
     

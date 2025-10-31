@@ -81,7 +81,7 @@ impl Serializer {
     fn serialize_choices<S: 'static, R: 'static>(
         &mut self,
         action: Action,
-    ) -> Option<ChoicesSerializer> {
+    ) -> Option<ChoicesSerializer<'_>> {
         self.add_state::<S>().map(move |state| ChoicesSerializer {
             serializer: self,
             state,
@@ -103,7 +103,7 @@ impl ChoicesSerializer<'_> {
         let message = Message::from_label(Type::new::<L>());
         let transition = Transition::new(self.role, self.action, message);
         self.serializer.previous = Some((self.state, transition));
-        S::serialize(&mut self.serializer);
+        S::serialize(self.serializer);
     }
 }
 
