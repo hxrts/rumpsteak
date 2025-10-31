@@ -314,7 +314,7 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
         return Err(ParseError::EmptyChoreography);
     }
 
-    let protocol = convert_statements_to_protocol(&statements);
+    let protocol = convert_statements_to_protocol(&statements, &roles);
 
     Ok(Choreography {
         name,
@@ -754,7 +754,7 @@ struct MessageSpec {
 }
 
 /// Convert statements to protocol AST
-fn convert_statements_to_protocol(statements: &[Statement]) -> Protocol {
+fn convert_statements_to_protocol(statements: &[Statement], roles: &[Role]) -> Protocol {
     if statements.is_empty() {
         return Protocol::End;
     }
@@ -778,11 +778,17 @@ fn convert_statements_to_protocol(statements: &[Statement]) -> Protocol {
                 continuation: Box::new(current),
             },
             Statement::Broadcast { from, message } => {
-                // In a real implementation, we'd resolve to all other roles
-                // For now, we'll create an empty broadcast that will be filled later
+                // Resolve to all roles except the sender
+                let from_role = Role::new(from.clone());
+                let to_all = roles
+                    .iter()
+                    .filter(|r| r.name != *from)
+                    .cloned()
+                    .collect();
+                
                 Protocol::Broadcast {
-                    from: Role::new(from.clone()),
-                    to_all: vec![], // Would be filled with actual roles in validation
+                    from: from_role,
+                    to_all,
                     message: MessageType {
                         name: message.name.clone(),
                         type_annotation: message.type_annotation.clone(),
@@ -798,23 +804,23 @@ fn convert_statements_to_protocol(statements: &[Statement]) -> Protocol {
                     .map(|b| Branch {
                         label: b.label.clone(),
                         guard: b.guard.clone(),
-                        protocol: convert_statements_to_protocol(&b.statements),
+                        protocol: convert_statements_to_protocol(&b.statements, roles),
                     })
                     .collect(),
             },
             Statement::Loop { condition, body } => Protocol::Loop {
                 condition: condition.clone(),
-                body: Box::new(convert_statements_to_protocol(body)),
+                body: Box::new(convert_statements_to_protocol(body, roles)),
             },
             Statement::Parallel { branches } => Protocol::Parallel {
                 protocols: branches
                     .iter()
-                    .map(|b| convert_statements_to_protocol(b))
+                    .map(|b| convert_statements_to_protocol(b, roles))
                     .collect(),
             },
             Statement::Rec { label, body } => Protocol::Rec {
                 label: label.clone(),
-                body: Box::new(convert_statements_to_protocol(body)),
+                body: Box::new(convert_statements_to_protocol(body, roles)),
             },
             Statement::Call { .. } => {
                 // This should not happen after inlining

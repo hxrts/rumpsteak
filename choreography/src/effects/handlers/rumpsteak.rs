@@ -8,9 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 
 use crate::effects::{ChoreoHandler, ChoreographyError, Label, Result, RoleId};
 use rumpsteak_aura::{Message, Role, Route};
@@ -19,12 +17,14 @@ use rumpsteak_aura::{Message, Role, Route};
 ///
 /// This is a simplified channel type for Phase 1 implementation.
 /// Phase 2 will integrate with full Rumpsteak session types.
-#[derive(Clone)]
+///
+/// Note: This does not implement Clone. Channels should be unique per endpoint
+/// and managed via the take/put pattern in SessionChannelBundle.
 pub struct SimpleChannel {
     /// Sender for outgoing messages
     sender: mpsc::UnboundedSender<Vec<u8>>,
-    /// Receiver for incoming messages (wrapped in Arc<Mutex> for cloning)
-    receiver: Arc<Mutex<mpsc::UnboundedReceiver<Vec<u8>>>>,
+    /// Receiver for incoming messages
+    receiver: mpsc::UnboundedReceiver<Vec<u8>>,
 }
 
 impl SimpleChannel {
@@ -36,11 +36,11 @@ impl SimpleChannel {
         (
             SimpleChannel {
                 sender: tx1,
-                receiver: Arc::new(Mutex::new(rx2)),
+                receiver: rx2,
             },
             SimpleChannel {
                 sender: tx2,
-                receiver: Arc::new(Mutex::new(rx1)),
+                receiver: rx1,
             },
         )
     }
@@ -55,8 +55,7 @@ impl SimpleChannel {
 
     /// Receive a message
     pub async fn recv(&mut self) -> std::result::Result<Vec<u8>, String> {
-        let mut receiver = self.receiver.lock().await;
-        receiver
+        self.receiver
             .next()
             .await
             .ok_or_else(|| "Channel closed".to_string())

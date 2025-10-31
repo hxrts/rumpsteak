@@ -1,3 +1,8 @@
+// Session type serialization to FSM format
+//
+// Converts session types to FSM representations for visualization and analysis.
+// Only available with the "serialize" feature.
+
 #![cfg(feature = "serialize")]
 
 use crate::{Branch, End, FromState, Receive, Role, Select, Send};

@@ -10,11 +10,9 @@ WASM support enables choreographic protocols in web applications, browser-based 
 
 The following features compile and run in WASM:
 
-Core session types and choreography system work fully. The InMemoryHandler provides local message passing for testing protocols. All middleware (Trace, Metrics, Retry, FaultInjection) functions correctly. Effect system and interpreter execute normally. Timeouts use wasm-timer for cross-platform support.
+Core session types and choreography system work fully. The InMemoryHandler provides local message passing for testing protocols. RumpsteakHandler now compiles for WASM and can be used with custom network transports (WebSocket, fetch API, etc.). All middleware (Trace, Metrics, Retry, FaultInjection) functions correctly. Effect system and interpreter execute normally. Timeouts use wasm-timer for cross-platform support.
 
 ## What Does Not Work in WASM
-
-RumpsteakHandler requires tokio and native networking. It does not compile for wasm32-unknown-unknown target.
 
 The caching example uses Redis and Hyper which are not WASM compatible.
 
@@ -80,6 +78,38 @@ python3 -m http.server 8000
 ```
 
 Open http://localhost:8000 in a browser to run the protocol.
+
+## Using RumpsteakHandler in WASM
+
+RumpsteakHandler now compiles for WASM. To use it with real network transport:
+
+```rust
+use wasm_bindgen::prelude::*;
+use rumpsteak_choreography::{RumpsteakHandler, RumpsteakEndpoint, SimpleChannel};
+
+#[wasm_bindgen]
+pub async fn run_distributed_protocol() -> Result<(), JsValue> {
+    // Create endpoints
+    let mut alice_ep = RumpsteakEndpoint::new(Role::Alice);
+    let mut bob_ep = RumpsteakEndpoint::new(Role::Bob);
+    
+    // Create channels (SimpleChannel works in WASM)
+    let (alice_ch, bob_ch) = SimpleChannel::pair();
+    alice_ep.register_channel(Role::Bob, alice_ch);
+    bob_ep.register_channel(Role::Alice, bob_ch);
+    
+    // Create handler
+    let mut handler = RumpsteakHandler::new();
+    
+    // Use with choreography operations
+    handler.send(&mut alice_ep, Role::Bob, &message).await?;
+    let response = handler.recv(&mut bob_ep, Role::Alice).await?;
+    
+    Ok(())
+}
+```
+
+SimpleChannel uses futures::channel::mpsc which is WASM-compatible. For distributed WASM applications, implement custom channels using browser APIs.
 
 ## Custom Network Transport
 

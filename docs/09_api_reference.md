@@ -54,11 +54,13 @@ LocalType is the projected view for a single role. Send and Receive represent co
 ```rust
 pub struct Role {
     pub name: Ident,
-    pub index: Option<RoleIndex>,
+    pub index: Option<usize>,
+    pub param: Option<TokenStream>,
+    pub array_size: Option<TokenStream>,
 }
 ```
 
-Role identifies a participant. Name is the role identifier. Index handles parameterized roles like Worker[N].
+Role identifies a participant. Name is the role identifier. Index holds concrete indices for indexed roles (e.g., `Worker[0]`). Param contains symbolic parameter expressions (e.g., `N` in `Worker[N]`). Array_size specifies the size of parameterized role arrays.
 
 ### MessageType
 
@@ -66,11 +68,11 @@ Role identifies a participant. Name is the role identifier. Index handles parame
 pub struct MessageType {
     pub name: Ident,
     pub payload: Option<Vec<Field>>,
-    pub type_params: Option<TokenStream>,
+    pub type_annotation: Option<TokenStream>,
 }
 ```
 
-MessageType describes a message. Name is the message identifier. Payload lists fields. Type_params contains generic type annotations.
+MessageType describes a message. Name is the message identifier. Payload lists fields. Type_annotation contains optional Rust type annotations like `<String>` or `<Vec<i32>>`.
 
 ## Parser API
 

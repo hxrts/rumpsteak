@@ -2,21 +2,21 @@
 
 ## Installation
 
-Add Rumpsteak to your project:
+Add Rumpsteak to your project (using the Aura fork):
 
 ```toml
 [dependencies]
-rumpsteak-aura = "0.1"
-rumpsteak-choreography = "0.1"
+rumpsteak-aura = { git = "https://github.com/aura-project/rumpsteak-aura" }
+rumpsteak-choreography = { git = "https://github.com/aura-project/rumpsteak-aura" }
 ```
 
 For WASM support, add the wasm feature:
 
 ```toml
-rumpsteak-choreography = { version = "0.1", features = ["wasm"] }
+rumpsteak-choreography = { git = "https://github.com/aura-project/rumpsteak-aura", features = ["wasm"] }
 ```
 
-## Creating aChoreography
+## Creating a Choreography
 
 This example shows a simple ping-pong protocol between two roles.
 

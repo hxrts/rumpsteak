@@ -23,9 +23,7 @@ pub use effects::{
     InterpretResult, InterpreterState, Label, Program, ProgramMessage, Result, RoleId,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use effects::RumpsteakHandler;
+pub use effects::{RumpsteakEndpoint, RumpsteakHandler, SimpleChannel};
 pub use runtime::{spawn, spawn_local};
 
 // Re-export macros from rumpsteak-macros

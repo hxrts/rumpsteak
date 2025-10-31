@@ -1,3 +1,7 @@
+// Core Rumpsteak library for session-typed communication
+//
+// Provides session types (Send, Receive, Select, Branch, End) and channel abstractions.
+
 pub mod channel;
 pub mod serialize;
 
