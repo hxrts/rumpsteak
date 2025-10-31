@@ -12,7 +12,25 @@ use std::{
 };
 use thiserror::Error;
 
-pub type SendError<Q, R> = <<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error;
+/// Trait for types that can be sealed to prevent further use
+pub trait Sealable {
+    /// Seal this channel, preventing further operations
+    fn seal(&mut self);
+
+    /// Check if this channel is sealed
+    fn is_sealed(&self) -> bool;
+}
+
+#[derive(Debug, Error)]
+pub enum SessionError<E> {
+    #[error("session was used after being sealed")]
+    Sealed,
+    #[error(transparent)]
+    Channel(E),
+}
+
+pub type SendError<Q, R> =
+    SessionError<<<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error>;
 
 #[derive(Debug, Error)]
 pub enum ReceiveError {
@@ -20,6 +38,8 @@ pub enum ReceiveError {
     EmptyStream,
     #[error("received message with an unexpected type")]
     UnexpectedType,
+    #[error("session was used after being sealed")]
+    Sealed,
 }
 
 /// This trait represents a message to be exchanged between two participants.
@@ -67,6 +87,12 @@ impl<L: marker::Send + Sync + 'static> Message<L> for Box<dyn Any + marker::Send
 
 pub trait Role {
     type Message;
+
+    /// Seal all routes for this role, preventing further communication
+    fn seal(&mut self);
+
+    /// Check if this role has been sealed
+    fn is_sealed(&self) -> bool;
 }
 
 pub trait Route<R>: Role + Sized {
@@ -107,7 +133,7 @@ pub trait IntoSession<'r>: FromState<'r> {
 
 /// This structure represents a terminated protocol.
 pub struct End<'r, R: Role> {
-    _state: State<'r, R>,
+    state: State<'r, R>,
 }
 
 impl<'r, R: Role> FromState<'r> for End<'r, R> {
@@ -115,7 +141,21 @@ impl<'r, R: Role> FromState<'r> for End<'r, R> {
 
     #[inline]
     fn from_state(state: State<'r, Self::Role>) -> Self {
-        Self { _state: state }
+        Self { state }
+    }
+}
+
+impl<'r, R: Role> End<'r, R> {
+    /// Consume the End state and seal the role
+    pub fn seal(self) {
+        self.state.role.seal();
+    }
+}
+
+impl<'r, R: Role> Drop for End<'r, R> {
+    fn drop(&mut self) {
+        // Seal the role when End is dropped
+        self.state.role.seal();
     }
 }
 
@@ -148,7 +188,15 @@ where
 {
     #[inline]
     pub async fn send(self, label: L) -> Result<S, SendError<Q, R>> {
-        self.state.role.route().send(Message::upcast(label)).await?;
+        if self.state.role.is_sealed() {
+            return Err(SessionError::Sealed);
+        }
+        self.state
+            .role
+            .route()
+            .send(Message::upcast(label))
+            .await
+            .map_err(SessionError::Channel)?;
         Ok(FromState::from_state(self.state))
     }
 }
@@ -182,6 +230,9 @@ where
 {
     #[inline]
     pub async fn receive(self) -> Result<(L, S), ReceiveError> {
+        if self.state.role.is_sealed() {
+            return Err(ReceiveError::Sealed);
+        }
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
         let label = message.downcast().or(Err(ReceiveError::UnexpectedType))?;
@@ -225,7 +276,15 @@ where
         C: Choice<'q, L>,
         C::Session: FromState<'q, Role = Q>,
     {
-        self.state.role.route().send(Message::upcast(label)).await?;
+        if self.state.role.is_sealed() {
+            return Err(SessionError::Sealed);
+        }
+        self.state
+            .role
+            .route()
+            .send(Message::upcast(label))
+            .await
+            .map_err(SessionError::Channel)?;
         Ok(FromState::from_state(self.state))
     }
 }
@@ -266,6 +325,9 @@ where
 {
     #[inline]
     pub async fn branch(self) -> Result<C, ReceiveError> {
+        if self.state.role.is_sealed() {
+            return Err(ReceiveError::Sealed);
+        }
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
         let choice = C::downcast(self.state, message);
@@ -276,6 +338,37 @@ where
 impl<'q, Q: Role, R, C> private::Session for Branch<'q, Q, R, C> {}
 
 impl<'q, Q: Role, R, C> Session<'q> for Branch<'q, Q, R, C> {}
+
+/// Guard that ensures proper session cleanup and detects protocol violations
+struct SessionGuard {
+    completed: bool,
+}
+
+impl SessionGuard {
+    fn new() -> Self {
+        Self { completed: false }
+    }
+
+    fn mark_completed(&mut self) {
+        self.completed = true;
+    }
+}
+
+impl Drop for SessionGuard {
+    fn drop(&mut self) {
+        if !self.completed {
+            // In debug mode, panic if the session was not properly completed
+            #[cfg(debug_assertions)]
+            {
+                if !std::thread::panicking() {
+                    panic!(
+                        "Session dropped without completing! This indicates a protocol violation."
+                    );
+                }
+            }
+        }
+    }
+}
 
 #[inline]
 pub async fn session<'r, R: Role, S: FromState<'r, Role = R>, T, F>(
@@ -297,8 +390,16 @@ pub async fn try_session<'r, R: Role, S: FromState<'r, Role = R>, T, E, F>(
 where
     F: Future<Output = Result<(T, End<'r, R>), E>>,
 {
+    let mut guard = SessionGuard::new();
     let session = FromState::from_state(State::new(role));
-    f(session).await.map(|(output, _)| output)
+    let result = f(session).await;
+
+    if result.is_ok() {
+        guard.mark_completed();
+    }
+
+    // End will seal the role when dropped
+    result.map(|(output, _)| output)
 }
 
 mod private {

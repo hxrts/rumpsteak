@@ -92,6 +92,10 @@ impl<'a> super::Token<'a> for Token<'a> {
     type Id = TokenId;
 }
 
+/// Token identifiers for FSM DOT parser
+///
+/// Some variants may be unused in the current parser implementation
+/// but are part of the complete DOT format specification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 #[allow(dead_code)]

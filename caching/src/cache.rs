@@ -1,3 +1,8 @@
+//! Cache role implementation for Redis-backed storage.
+//!
+//! The cache role manages a distributed cache using Redis, with support for
+//! optimistic locking to coordinate concurrent access.
+
 use crate::{client::Client, origin::Origin, proxy::Proxy, wrap, Channel, Entry, Result};
 use fred::{
     client::RedisClient,
@@ -11,6 +16,7 @@ use tracing::{debug, error};
 
 const MAX_RETRY_DELAY: u64 = 1000;
 
+/// The cache role that manages Redis-backed storage.
 #[derive(Role)]
 #[message(Box<dyn Any + marker::Send>)]
 pub struct Cache {
@@ -22,16 +28,22 @@ pub struct Cache {
     pub(crate) origin: Nil,
 }
 
+/// Message to acquire a lock on a cache key.
 pub struct Lock(pub(crate) String);
 
+/// Message indicating lock has been acquired.
 pub struct Locked;
 
+/// Message to release a lock.
 pub struct Unlock;
 
+/// Message to load an entry from the cache.
 pub struct Load;
 
+/// Message to store an entry in the cache.
 pub struct Store(pub(crate) Entry);
 
+/// Message to remove an entry from the cache.
 pub struct Remove;
 
 #[session]
@@ -45,9 +57,15 @@ enum Choice {
     Unlock(Unlock, End),
 }
 
+/// State of the cache replica.
+///
+/// Tracks whether the local copy has been modified since being loaded.
 enum Replica {
+    /// No replica loaded yet
     None,
+    /// Replica loaded and unchanged
     Clean(Option<Entry>),
+    /// Replica has been modified
     Dirty(Option<Entry>),
 }
 
@@ -117,6 +135,9 @@ async fn try_run(role: &mut Cache, redis: &RedisClient) -> Result<()> {
     .await
 }
 
+/// Runs the cache role protocol.
+///
+/// Manages cache storage with optimistic locking using Redis.
 pub async fn run(role: &mut Cache, redis: &RedisClient) -> Result<()> {
     let result = try_run(role, redis).await;
     if let Err(err) = &result {

@@ -31,3 +31,36 @@ jobs:
         with:
           command: test
           args: --workspace --all-targets --all-features
+  
+  wasm:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Check WASM compilation (choreography)
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --package rumpsteak-choreography --target wasm32-unknown-unknown --features wasm
+      - name: Check WASM compilation (core)
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --package rumpsteak-aura --target wasm32-unknown-unknown --features wasm
+      - name: Build WASM example
+        run: |
+          cd examples/wasm-ping-pong
+          wasm-pack build --target web
+      - name: Test WASM example (headless)
+        run: |
+          cd examples/wasm-ping-pong
+          wasm-pack test --headless --firefox

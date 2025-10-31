@@ -116,6 +116,10 @@ impl<'a> super::Token<'a> for Token<'a> {
     type Id = TokenId;
 }
 
+/// Token identifiers for transition DOT parser
+///
+/// Some variants may be unused in the current parser implementation
+/// but are part of the complete DOT format specification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 #[allow(dead_code)]
@@ -467,10 +471,6 @@ fn parse_expression(
 pub(super) trait Expression: Eq + Hash + Sized {
     fn parse_refinement(_: &mut Lexer) -> Option<Option<Spanned<Self>>> {
         Some(None)
-    }
-
-    fn parse_assignments(_: &mut Lexer) -> Option<Vec<(String, Self)>> {
-        Some(Vec::new())
     }
 }
 

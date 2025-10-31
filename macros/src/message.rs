@@ -1,7 +1,16 @@
+//! Implementation of the `Message` derive macro.
+//!
+//! Provides automatic implementation of the `Message` trait for message types
+//! used in session-typed protocols.
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse2, Data, DeriveInput, Error, Fields, Result};
 
+/// Implements the `Message` trait for the given type.
+///
+/// For structs, implements identity conversions. For enums, implements
+/// conversions for each variant.
 pub fn message(input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<DeriveInput>(input)?;
 

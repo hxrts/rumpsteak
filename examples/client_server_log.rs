@@ -97,16 +97,19 @@ struct Data(u32);
 
 struct K;
 
+#[allow(dead_code)]
 struct O(u32);
 
 struct Fault;
 
+#[allow(dead_code)]
 struct Log(u32);
 
 #[session]
 type CslC = Send<S, Request, Send<S, Data, Branch<S, CslC3>>>;
 
 #[session]
+#[allow(dead_code)]
 enum CslC3 {
     Fault(Fault, End),
     O(O, End),

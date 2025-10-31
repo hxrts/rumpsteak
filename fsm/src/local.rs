@@ -1,14 +1,38 @@
+//! Local session types represented as recursive types.
+//!
+//! This module provides conversion from FSMs to textual local session type representations.
+
 use super::{Fsm, StateIndex, Transition};
 use std::fmt::{self, Display, Formatter};
 
+/// Local session type representation.
+///
+/// Converts an FSM into a textual recursive type that represents the local session type.
+/// This is useful for displaying protocols in a readable format and for understanding
+/// the session type structure.
+///
+/// # Example Output
+///
+/// ```text
+/// rec X0 . Server!Request; [Server?Accept; end, Server?Reject; X0]
+/// ```
 pub enum Local<R, N, E> {
+    /// End of the protocol
     End,
+    /// Recursion variable reference
     Recursion(usize),
+    /// Recursion variable binding
     Variable(usize, Box<Self>),
+    /// Choice between multiple transitions
     Transitions(Vec<(Transition<R, N, E>, Box<Self>)>),
 }
 
 impl<R: Clone, N: Clone, E: Clone> Local<R, N, E> {
+    /// Constructs a local type representation from an FSM.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the FSM has no states.
     pub fn new(fsm: &Fsm<R, N, E>) -> Self {
         let size = fsm.size().0;
         assert!(size > 0);

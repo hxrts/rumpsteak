@@ -23,6 +23,16 @@ trait Token<'a>: Logos<'a> {
     type Id: TokenId;
 
     fn id(&self) -> Self::Id {
+        // SAFETY: This transmute is safe because:
+        // 1. Self and Self::Id have the same memory layout (discriminant-only enums)
+        // 2. TokenId trait is sealed and only implemented for enums derived from Token
+        // 3. The Token::Id type is always a smaller enum containing just the discriminants
+        // 4. This is equivalent to reading just the discriminant field of the enum
+        // 5. Both types are Copy and 'static, ensuring no lifetime issues
+        //
+        // This pattern allows extracting the enum discriminant without pattern matching,
+        // which is useful for generic parsing logic that needs to compare token types
+        // without knowing their specific variant data.
         unsafe { *(self as *const _ as *const _) }
     }
 }

@@ -65,7 +65,7 @@ impl<'a> Analyzer<'a> {
         for role in &choreography.roles {
             role_stats.insert(role.clone(), RoleStats::default());
         }
-        
+
         Analyzer {
             choreography,
             warnings: Vec::new(),
@@ -76,29 +76,30 @@ impl<'a> Analyzer<'a> {
             },
         }
     }
-    
+
     fn analyze(&mut self) -> AnalysisResult {
         // Collect statistics
         self.analyze_protocol(&self.choreography.protocol);
-        
+
         // Check for deadlocks
         let is_deadlock_free = self.check_deadlock_freedom();
-        
+
         // Check for progress
         let has_progress = self.check_progress();
-        
+
         // Check role participation
         let role_participation = self.compute_participation_info();
-        
+
         // Check for unused roles
         for role in &self.choreography.roles {
             if let Some(info) = role_participation.get(role) {
                 if !info.is_active {
-                    self.warnings.push(AnalysisWarning::UnusedRole(role.clone()));
+                    self.warnings
+                        .push(AnalysisWarning::UnusedRole(role.clone()));
                 }
             }
         }
-        
+
         AnalysisResult {
             is_deadlock_free,
             has_progress,
@@ -107,24 +108,40 @@ impl<'a> Analyzer<'a> {
             communication_graph: self.comm_graph.clone(),
         }
     }
-    
+
     fn analyze_protocol(&mut self, protocol: &Protocol) {
         match protocol {
-            Protocol::Send { from, to, message, continuation } => {
-                self.role_stats.get_mut(from).unwrap().sends += 1;
-                self.role_stats.get_mut(to).unwrap().receives += 1;
-                self.comm_graph.edges.push((
-                    from.clone(),
-                    to.clone(),
-                    message.name.to_string(),
-                ));
+            Protocol::Send {
+                from,
+                to,
+                message,
+                continuation,
+            } => {
+                if let Some(stats) = self.role_stats.get_mut(from) {
+                    stats.sends += 1;
+                }
+                if let Some(stats) = self.role_stats.get_mut(to) {
+                    stats.receives += 1;
+                }
+                self.comm_graph
+                    .edges
+                    .push((from.clone(), to.clone(), message.name.to_string()));
                 self.analyze_protocol(continuation);
             }
-            
-            Protocol::Broadcast { from, to_all, message, continuation } => {
-                self.role_stats.get_mut(from).unwrap().sends += to_all.len();
+
+            Protocol::Broadcast {
+                from,
+                to_all,
+                message,
+                continuation,
+            } => {
+                if let Some(stats) = self.role_stats.get_mut(from) {
+                    stats.sends += to_all.len();
+                }
                 for to in to_all {
-                    self.role_stats.get_mut(to).unwrap().receives += 1;
+                    if let Some(stats) = self.role_stats.get_mut(to) {
+                        stats.receives += 1;
+                    }
                     self.comm_graph.edges.push((
                         from.clone(),
                         to.clone(),
@@ -133,12 +150,15 @@ impl<'a> Analyzer<'a> {
                 }
                 self.analyze_protocol(continuation);
             }
-            
+
             Protocol::Choice { role, branches } => {
-                self.role_stats.get_mut(role).unwrap().choices += 1;
-                
+                if let Some(stats) = self.role_stats.get_mut(role) {
+                    stats.choices += 1;
+                }
+
                 // Check for asymmetric choices
-                let recipients: HashSet<_> = branches.iter()
+                let recipients: HashSet<_> = branches
+                    .iter()
                     .filter_map(|branch| {
                         if let Protocol::Send { to, .. } = &branch.protocol {
                             Some(to.clone())
@@ -147,55 +167,63 @@ impl<'a> Analyzer<'a> {
                         }
                     })
                     .collect();
-                
+
                 if recipients.len() > 1 {
-                    self.warnings.push(AnalysisWarning::AsymmetricChoice(role.clone()));
+                    self.warnings
+                        .push(AnalysisWarning::AsymmetricChoice(role.clone()));
                 }
-                
+
                 for branch in branches {
                     self.analyze_protocol(&branch.protocol);
                 }
             }
-            
+
             Protocol::Loop { body, .. } => {
                 self.analyze_protocol(body);
             }
-            
+
             Protocol::Parallel { protocols } => {
                 for p in protocols {
                     self.analyze_protocol(p);
                 }
             }
-            
+
             Protocol::Rec { body, .. } => {
                 self.analyze_protocol(body);
             }
-            
+
             Protocol::Var(_) | Protocol::End => {}
         }
     }
-    
+
     fn check_deadlock_freedom(&self) -> bool {
         // Simple check: ensure no circular waiting patterns
         // More sophisticated analysis would use session type techniques
-        
+
         // Build dependency graph
         let mut dependencies: HashMap<Role, HashSet<Role>> = HashMap::new();
         for role in &self.choreography.roles {
             dependencies.insert(role.clone(), HashSet::new());
         }
-        
+
         // Analyze protocol for dependencies
         Self::extract_dependencies(&self.choreography.protocol, &mut dependencies);
-        
+
         // Check for cycles using DFS
         !has_cycle(&dependencies)
     }
-    
+
     fn extract_dependencies(protocol: &Protocol, deps: &mut HashMap<Role, HashSet<Role>>) {
         match protocol {
-            Protocol::Send { from, to, continuation, .. } => {
-                deps.get_mut(to).unwrap().insert(from.clone());
+            Protocol::Send {
+                from,
+                to,
+                continuation,
+                ..
+            } => {
+                if let Some(to_deps) = deps.get_mut(to) {
+                    to_deps.insert(from.clone());
+                }
                 Self::extract_dependencies(continuation, deps);
             }
             Protocol::Choice { branches, .. } => {
@@ -221,12 +249,12 @@ impl<'a> Analyzer<'a> {
             Protocol::Var(_) | Protocol::End => {}
         }
     }
-    
+
     fn check_progress(&self) -> bool {
         // Check that the protocol eventually terminates or makes progress
         Self::check_protocol_progress(&self.choreography.protocol)
     }
-    
+
     fn check_protocol_progress(protocol: &Protocol) -> bool {
         match protocol {
             Protocol::End => true,
@@ -236,38 +264,39 @@ impl<'a> Analyzer<'a> {
             }
             Protocol::Choice { branches, .. } => {
                 // All branches must have progress
-                branches.iter().all(|b| Self::check_protocol_progress(&b.protocol))
+                branches
+                    .iter()
+                    .all(|b| Self::check_protocol_progress(&b.protocol))
             }
             Protocol::Loop { body, .. } => {
                 // Check that loop body has communication (progress)
                 has_communication(body)
             }
-            Protocol::Parallel { protocols } => {
-                protocols.iter().all(Self::check_protocol_progress)
-            }
+            Protocol::Parallel { protocols } => protocols.iter().all(Self::check_protocol_progress),
             Protocol::Rec { body, .. } => {
                 // Recursive protocols must have communication
                 has_communication(body)
             }
             Protocol::Var(_) => true, // Assume recursive calls are okay
-            Protocol::Broadcast { continuation, .. } => {
-                Self::check_protocol_progress(continuation)
-            }
+            Protocol::Broadcast { continuation, .. } => Self::check_protocol_progress(continuation),
         }
     }
-    
+
     fn compute_participation_info(&self) -> HashMap<Role, ParticipationInfo> {
         let mut result = HashMap::new();
-        
+
         for (role, stats) in &self.role_stats {
-            result.insert(role.clone(), ParticipationInfo {
-                sends: stats.sends,
-                receives: stats.receives,
-                choices: stats.choices,
-                is_active: stats.sends > 0 || stats.receives > 0 || stats.choices > 0,
-            });
+            result.insert(
+                role.clone(),
+                ParticipationInfo {
+                    sends: stats.sends,
+                    receives: stats.receives,
+                    choices: stats.choices,
+                    is_active: stats.sends > 0 || stats.receives > 0 || stats.choices > 0,
+                },
+            );
         }
-        
+
         result
     }
 }
@@ -277,14 +306,13 @@ impl<'a> Analyzer<'a> {
 fn has_cycle(graph: &HashMap<Role, HashSet<Role>>) -> bool {
     let mut visited = HashSet::new();
     let mut rec_stack = HashSet::new();
-    
+
     for node in graph.keys() {
-        if !visited.contains(node) 
-            && dfs_cycle(node, graph, &mut visited, &mut rec_stack) {
-                return true;
-            }
+        if !visited.contains(node) && dfs_cycle(node, graph, &mut visited, &mut rec_stack) {
+            return true;
+        }
     }
-    
+
     false
 }
 
@@ -296,7 +324,7 @@ fn dfs_cycle(
 ) -> bool {
     visited.insert(node.clone());
     rec_stack.insert(node.clone());
-    
+
     if let Some(neighbors) = graph.get(node) {
         for neighbor in neighbors {
             if !visited.contains(neighbor) {
@@ -308,7 +336,7 @@ fn dfs_cycle(
             }
         }
     }
-    
+
     rec_stack.remove(node);
     false
 }
@@ -320,9 +348,7 @@ fn has_communication(protocol: &Protocol) -> bool {
             branches.iter().any(|b| has_communication(&b.protocol))
         }
         Protocol::Loop { body, .. } => has_communication(body),
-        Protocol::Parallel { protocols } => {
-            protocols.iter().any(has_communication)
-        }
+        Protocol::Parallel { protocols } => protocols.iter().any(has_communication),
         Protocol::Rec { body, .. } => has_communication(body),
         Protocol::Var(_) | Protocol::End => false,
     }
@@ -333,12 +359,12 @@ pub fn generate_dot_graph(comm_graph: &CommunicationGraph) -> String {
     let mut dot = String::from("digraph G {\n");
     dot.push_str("  rankdir=LR;\n");
     dot.push_str("  node [shape=circle];\n");
-    
+
     // Add nodes
     for node in &comm_graph.nodes {
         dot.push_str(&format!("  {};\n", node.name));
     }
-    
+
     // Add edges
     for (from, to, label) in &comm_graph.edges {
         dot.push_str(&format!(
@@ -346,7 +372,7 @@ pub fn generate_dot_graph(comm_graph: &CommunicationGraph) -> String {
             from.name, to.name, label
         ));
     }
-    
+
     dot.push_str("}\n");
     dot
 }

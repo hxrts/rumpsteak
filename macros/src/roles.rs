@@ -1,7 +1,15 @@
+//! Implementation of the `Roles` derive macro.
+//!
+//! Provides automatic implementation of the `Default` trait for roles containers,
+//! creating paired channels between all roles automatically.
+
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse2, Data, DeriveInput, Error, Index, Result};
 
+/// Implements the `Default` trait for a roles container.
+///
+/// Automatically creates paired bidirectional channels between all roles.
 pub fn roles(input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<DeriveInput>(input)?;
 

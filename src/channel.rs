@@ -1,3 +1,4 @@
+use crate::Sealable;
 use futures::{channel::mpsc, Sink, Stream};
 use std::{
     pin::Pin,
@@ -18,6 +19,17 @@ impl Pair<Nil> for Nil {
     }
 }
 
+impl Sealable for Nil {
+    fn seal(&mut self) {
+        // Nil has no channels to seal
+    }
+
+    fn is_sealed(&self) -> bool {
+        // Nil is never sealed (or always sealed - doesn't matter)
+        false
+    }
+}
+
 impl<T> Pair<mpsc::UnboundedReceiver<T>> for mpsc::UnboundedSender<T> {
     fn pair() -> (Self, mpsc::UnboundedReceiver<T>) {
         mpsc::unbounded()
@@ -31,15 +43,45 @@ impl<T> Pair<mpsc::UnboundedSender<T>> for mpsc::UnboundedReceiver<T> {
     }
 }
 
+impl<T> Sealable for mpsc::UnboundedSender<T> {
+    fn seal(&mut self) {
+        // Close the sender
+        self.close_channel();
+    }
+
+    fn is_sealed(&self) -> bool {
+        // Check if the sender is closed
+        self.is_closed()
+    }
+}
+
+impl<T> Sealable for mpsc::UnboundedReceiver<T> {
+    fn seal(&mut self) {
+        // Close the receiver by dropping
+        self.close();
+    }
+
+    fn is_sealed(&self) -> bool {
+        // Receivers don't have a direct is_closed check
+        // We'll consider them never sealed since they're passive
+        false
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Bidirectional<S, R> {
     sender: S,
     receiver: R,
+    sealed: bool,
 }
 
 impl<S, R> Bidirectional<S, R> {
     pub fn new(sender: S, receiver: R) -> Self {
-        Self { sender, receiver }
+        Self {
+            sender,
+            receiver,
+            sealed: false,
+        }
     }
 }
 
@@ -87,7 +129,22 @@ impl<T, S: Sink<T> + Unpin, R: Unpin> Sink<T> for Bidirectional<S, R> {
 impl<S: Unpin, R: Stream + Unpin> Stream for Bidirectional<S, R> {
     type Item = R::Item;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        R::poll_next(self.receiver(), cx)
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // Check sealed status before delegating to receiver
+        if self.sealed {
+            return Poll::Ready(None);
+        }
+        // Use the receiver() helper for consistent Pin projection
+        R::poll_next(self.as_mut().receiver(), cx)
+    }
+}
+
+impl<S, R> Sealable for Bidirectional<S, R> {
+    fn seal(&mut self) {
+        self.sealed = true;
+    }
+
+    fn is_sealed(&self) -> bool {
+        self.sealed
     }
 }

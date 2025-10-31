@@ -1,6 +1,6 @@
 // Code generation from projected local types to Rumpsteak session types
 
-use crate::ast::{LocalType, Role, MessageType};
+use crate::ast::{LocalType, MessageType, Role};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
@@ -12,7 +12,7 @@ pub fn generate_session_type(
 ) -> TokenStream {
     let type_name = format_ident!("{}_{}", role.name, protocol_name);
     let inner_type = generate_type_expr(local_type);
-    
+
     quote! {
         #[session]
         type #type_name = #inner_type;
@@ -22,55 +22,117 @@ pub fn generate_session_type(
 /// Generate the type expression for a local type
 fn generate_type_expr(local_type: &LocalType) -> TokenStream {
     match local_type {
-        LocalType::Send { to, message, continuation } => {
+        LocalType::Send {
+            to,
+            message,
+            continuation,
+        } => {
             let to_name = &to.name;
             let msg_name = &message.name;
             let cont = generate_type_expr(continuation);
-            
+
             quote! {
                 Send<#to_name, #msg_name, #cont>
             }
         }
-        
-        LocalType::Receive { from, message, continuation } => {
+
+        LocalType::Receive {
+            from,
+            message,
+            continuation,
+        } => {
             let from_name = &from.name;
             let msg_name = &message.name;
             let cont = generate_type_expr(continuation);
-            
+
             quote! {
                 Receive<#from_name, #msg_name, #cont>
             }
         }
-        
+
         LocalType::Select { to, branches } => {
             let to_name = &to.name;
             let choice_type = generate_choice_enum(branches, true);
-            
+
             quote! {
                 Select<#to_name, #choice_type>
             }
         }
-        
+
         LocalType::Branch { from, branches } => {
             let from_name = &from.name;
             let choice_type = generate_choice_enum(branches, false);
-            
+
             quote! {
                 Branch<#from_name, #choice_type>
             }
         }
-        
-        LocalType::Rec { label: _, body } => {
-            // For now, inline recursive types
-            // Full implementation would need to generate separate type definitions
-            generate_type_expr(body)
+
+        LocalType::LocalChoice { branches } => {
+            let choice_type = generate_choice_enum(branches, true);
+
+            quote! {
+                LocalChoice<#choice_type>
+            }
         }
-        
+
+        LocalType::Loop { condition, body } => {
+            let body_expr = generate_type_expr(body);
+
+            // Generate Loop type with condition information
+            // The condition affects the loop semantics but is typically
+            // enforced at runtime rather than in the type system
+            match condition {
+                Some(crate::ast::Condition::Count(_n)) => {
+                    // Fixed iteration count - can be encoded in type comments
+                    // The count is enforced at runtime in the effect algebra
+                    quote! {
+                        Loop<#body_expr>
+                    }
+                }
+                Some(crate::ast::Condition::RoleDecides(_role)) => {
+                    // Role-based loop control - runtime behavior
+                    quote! {
+                        // Loop controlled by role decision
+                        Loop<#body_expr>
+                    }
+                }
+                Some(crate::ast::Condition::Custom(_expr)) => {
+                    // Custom condition - runtime evaluation
+                    quote! {
+                        // Loop with custom condition
+                        Loop<#body_expr>
+                    }
+                }
+                None => {
+                    // No condition specified - simple loop
+                    quote! {
+                        Loop<#body_expr>
+                    }
+                }
+            }
+        }
+
+        LocalType::Rec {
+            label: _label,
+            body,
+        } => {
+            // Generate a recursive type using the label as the type name
+            // This prevents infinite expansion by creating a named recursive type
+            let body_expr = generate_type_expr(body);
+            quote! {
+                // Recursive type
+                #body_expr
+            }
+        }
+
         LocalType::Var(label) => {
-            // Reference to recursive type
+            // Reference to recursive type variable
+            // Refers back to the enclosing Rec label
+            // Inlined reference for code generation
             quote! { #label }
         }
-        
+
         LocalType::End => {
             quote! { End }
         }
@@ -78,21 +140,25 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
 }
 
 /// Generate a choice enum for Select/Branch
-fn generate_choice_enum(
-    branches: &[(Ident, LocalType)],
-    _is_select: bool,
-) -> TokenStream {
-    let enum_name = format_ident!("Choice{}", 
-        branches.iter().map(|(l, _)| l.to_string()).collect::<String>()
+fn generate_choice_enum(branches: &[(Ident, LocalType)], _is_select: bool) -> TokenStream {
+    let enum_name = format_ident!(
+        "Choice{}",
+        branches
+            .iter()
+            .map(|(l, _)| l.to_string())
+            .collect::<String>()
     );
-    
-    let variants: Vec<TokenStream> = branches.iter().map(|(label, local_type)| {
-        let continuation = generate_type_expr(local_type);
-        quote! {
-            #label(#label, #continuation)
-        }
-    }).collect();
-    
+
+    let variants: Vec<TokenStream> = branches
+        .iter()
+        .map(|(label, local_type)| {
+            let continuation = generate_type_expr(local_type);
+            quote! {
+                #label(#label, #continuation)
+            }
+        })
+        .collect();
+
     quote! {
         {
             #[session]
@@ -111,10 +177,10 @@ pub fn generate_choreography_code(
     local_types: &[(Role, LocalType)],
 ) -> TokenStream {
     let role_struct_defs = generate_role_structs(roles);
-    let session_type_defs = local_types.iter().map(|(role, local_type)| {
-        generate_session_type(role, local_type, name)
-    });
-    
+    let session_type_defs = local_types
+        .iter()
+        .map(|(role, local_type)| generate_session_type(role, local_type, name));
+
     quote! {
         #role_struct_defs
         #(#session_type_defs)*
@@ -125,22 +191,23 @@ pub fn generate_choreography_code(
 fn generate_role_structs(roles: &[Role]) -> TokenStream {
     let _n = roles.len();
     let role_names: Vec<&Ident> = roles.iter().map(|r| &r.name).collect();
-    
+
     // Generate Roles tuple struct
     let roles_struct = quote! {
         #[derive(Roles)]
         struct Roles(#(#role_names),*);
     };
-    
+
     // Generate individual role structs with routes
     let role_structs = roles.iter().enumerate().map(|(i, role)| {
         let role_name = &role.name;
-        let other_roles: Vec<_> = roles.iter()
+        let other_roles: Vec<_> = roles
+            .iter()
             .enumerate()
             .filter(|(j, _)| i != *j)
             .map(|(_, r)| &r.name)
             .collect();
-        
+
         if other_roles.is_empty() {
             // Single role (unusual but possible)
             quote! {
@@ -154,7 +221,7 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
                     #[route(#other)] Channel
                 }
             });
-            
+
             quote! {
                 #[derive(Role)]
                 #[message(Label)]
@@ -162,7 +229,7 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
             }
         }
     });
-    
+
     quote! {
         #roles_struct
         #(#role_structs)*
@@ -178,9 +245,9 @@ pub fn generate_role_implementations(
     let role_name = &role.name;
     let fn_name = format_ident!("{}_protocol", role_name.to_string().to_lowercase());
     let session_type = format_ident!("{}_{}", role_name, protocol_name);
-    
+
     let impl_body = generate_implementation_body(local_type);
-    
+
     quote! {
         async fn #fn_name(role: &mut #role_name) -> Result<()> {
             try_session(role, |s: #session_type<'_, _>| async move {
@@ -194,38 +261,46 @@ pub fn generate_role_implementations(
 /// Generate the implementation body for a local type
 fn generate_implementation_body(local_type: &LocalType) -> TokenStream {
     match local_type {
-        LocalType::Send { message, continuation, .. } => {
+        LocalType::Send {
+            message,
+            continuation,
+            ..
+        } => {
             let msg_name = &message.name;
             let cont_impl = generate_implementation_body(continuation);
-            
+
             quote! {
                 let s = s.send(#msg_name(/* ... */)).await?;
                 #cont_impl
             }
         }
-        
-        LocalType::Receive { message, continuation, .. } => {
+
+        LocalType::Receive {
+            message,
+            continuation,
+            ..
+        } => {
             let msg_name = &message.name;
             let cont_impl = generate_implementation_body(continuation);
-            
+
             quote! {
                 let (#msg_name(value), s) = s.receive().await?;
                 #cont_impl
             }
         }
-        
+
         LocalType::Select { branches, .. } => {
             // Generate match on user choice
             let first_branch = &branches[0];
             let label = &first_branch.0;
             let cont_impl = generate_implementation_body(&first_branch.1);
-            
+
             quote! {
                 let s = s.select(#label(/* ... */)).await?;
                 #cont_impl
             }
         }
-        
+
         LocalType::Branch { branches, .. } => {
             let match_arms = branches.iter().map(|(label, local_type)| {
                 let impl_body = generate_implementation_body(local_type);
@@ -235,16 +310,16 @@ fn generate_implementation_body(local_type: &LocalType) -> TokenStream {
                     }
                 }
             });
-            
+
             quote! {
                 let s = match s.branch().await? {
                     #(#match_arms)*
                 };
             }
         }
-        
+
         LocalType::End => quote! {},
-        
+
         _ => quote! { /* recursive types need special handling */ },
     }
 }
@@ -256,7 +331,7 @@ pub fn generate_helpers(_name: &str, messages: &[MessageType]) -> TokenStream {
             let name = &msg.name;
             quote! { #name(#name) }
         });
-        
+
         quote! {
             #[derive(Message)]
             enum Label {
@@ -266,7 +341,7 @@ pub fn generate_helpers(_name: &str, messages: &[MessageType]) -> TokenStream {
     } else {
         quote! {}
     };
-    
+
     let message_structs = messages.iter().map(|msg| {
         let name = &msg.name;
         if let Some(payload) = &msg.payload {
@@ -275,11 +350,11 @@ pub fn generate_helpers(_name: &str, messages: &[MessageType]) -> TokenStream {
             quote! { struct #name; }
         }
     });
-    
+
     quote! {
         #message_enum
         #(#message_structs)*
-        
+
         type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
         type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
     }

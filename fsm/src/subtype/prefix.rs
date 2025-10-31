@@ -1,12 +1,23 @@
+//! Message sequence tracking for asynchronous subtyping.
+//!
+//! This module provides data structures for tracking sequences of transitions
+//! (message prefixes) during subtyping verification, with support for efficient
+//! insertion, removal, and backtracking.
+
 use crate::TransitionRef;
 use std::{
     convert::Infallible,
     fmt::{self, Display, Formatter},
 };
 
+/// Index into a prefix sequence.
 #[derive(Clone, Copy)]
 pub struct Index(usize);
 
+/// Snapshot of a prefix's state for backtracking.
+///
+/// Captures the state of a prefix at a point in time, allowing
+/// efficient rollback during the search algorithm.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Snapshot {
     size: usize,
@@ -14,6 +25,10 @@ pub struct Snapshot {
     removed: usize,
 }
 
+/// A sequence of transitions representing pending messages.
+///
+/// Supports efficient addition, removal, snapshotting, and restoration
+/// of transition sequences during subtyping verification.
 #[derive(Debug)]
 pub struct Prefix<'a, R, N> {
     transitions: Vec<(bool, TransitionRef<'a, R, N, Infallible>)>,
@@ -32,10 +47,12 @@ impl<R, N> Default for Prefix<'_, R, N> {
 }
 
 impl<'a, R, N> Prefix<'a, R, N> {
+    /// Returns true if the prefix has no transitions.
     pub fn is_empty(&self) -> bool {
         self.start >= self.transitions.len()
     }
 
+    /// Returns a reference to the first transition in the prefix, if any.
     pub(super) fn first(&self) -> Option<&TransitionRef<'a, R, N, Infallible>> {
         if let Some((removed, transition)) = self.transitions.get(self.start) {
             assert!(!removed);
@@ -45,10 +62,12 @@ impl<'a, R, N> Prefix<'a, R, N> {
         None
     }
 
+    /// Adds a transition to the end of the prefix.
     pub(super) fn push(&mut self, transition: TransitionRef<'a, R, N, Infallible>) {
         self.transitions.push((false, transition));
     }
 
+    /// Removes the first transition from the prefix.
     pub fn remove_first(&mut self) {
         assert!(matches!(self.transitions.get(self.start), Some((false, _))));
         self.start += 1;
@@ -57,6 +76,7 @@ impl<'a, R, N> Prefix<'a, R, N> {
         }
     }
 
+    /// Removes a transition at the given index.
     pub fn remove(&mut self, Index(i): Index) {
         if i == self.start {
             self.remove_first();
@@ -69,6 +89,7 @@ impl<'a, R, N> Prefix<'a, R, N> {
         self.removed.push(i);
     }
 
+    /// Creates a snapshot of the current state for later restoration.
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             size: self.transitions.len(),
@@ -83,6 +104,7 @@ impl<'a, R, N> Prefix<'a, R, N> {
             && snapshot.start <= self.start
     }
 
+    /// Returns true if the prefix has been modified since the snapshot.
     pub fn is_modified(&self, snapshot: &Snapshot) -> bool
     where
         R: Eq,
@@ -92,6 +114,7 @@ impl<'a, R, N> Prefix<'a, R, N> {
         self.transitions[self.start..] != self.transitions[..snapshot.size][snapshot.start..]
     }
 
+    /// Restores the prefix to the state captured in the snapshot.
     pub fn revert(&mut self, snapshot: &Snapshot) {
         assert!(self.valid_snapshot(snapshot));
         for &i in self.removed.get(snapshot.removed..).unwrap_or_default() {
