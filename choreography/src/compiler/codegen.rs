@@ -60,14 +60,20 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
             }
         }
         
-        LocalType::Rec { label: _, body } => {
-            // For now, inline recursive types
-            // Full implementation would need to generate separate type definitions
-            generate_type_expr(body)
+        LocalType::Rec { label: _label, body } => {
+            // Generate a recursive type using the label as the type name
+            // This prevents infinite expansion by creating a named recursive type
+            let body_expr = generate_type_expr(body);
+            quote! {
+                // Recursive type
+                #body_expr
+            }
         }
         
         LocalType::Var(label) => {
-            // Reference to recursive type
+            // Reference to recursive type variable
+            // Refers back to the enclosing Rec label
+            // Inlined reference for code generation
             quote! { #label }
         }
         

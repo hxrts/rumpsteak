@@ -20,6 +20,7 @@ rumpsteak-macros = { path = "../macros", version = "0.1" }
 futures = "0.3"
 tokio = { version = "1.35", features = ["full"] }
 async-trait = "0.1"
+async-recursion = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
 anyhow = "1.0"

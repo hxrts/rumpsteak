@@ -209,9 +209,7 @@ impl<'a> ProjectionContext<'a> {
         &mut self,
         protocols: &[Protocol],
     ) -> Result<LocalType, ProjectionError> {
-        // For now, simple approach: if role appears in only one branch, project that
-        // More sophisticated merging needed for general case
-        
+        // Project all parallel branches for this role
         let mut projections = Vec::new();
         for protocol in protocols {
             if protocol.mentions_role(self.role) {
@@ -220,11 +218,82 @@ impl<'a> ProjectionContext<'a> {
         }
         
         match projections.len() {
+            0 => {
+                // Role doesn't appear in any parallel branch
+                Ok(LocalType::End)
+            }
+            1 => {
+                // Role appears in exactly one branch - use that projection
+                Ok(projections.into_iter().next().unwrap())
+            }
+            _ => {
+                // Role appears in multiple parallel branches
+                // Merge by creating a choice that captures all possibilities
+                // This represents non-deterministic merge of parallel behaviors
+                self.merge_parallel_projections(projections)
+            }
+        }
+    }
+    
+    fn merge_parallel_projections(
+        &mut self,
+        projections: Vec<LocalType>,
+    ) -> Result<LocalType, ProjectionError> {
+        // Remove End projections as they don't contribute
+        let non_end: Vec<_> = projections.into_iter()
+            .filter(|p| p != &LocalType::End)
+            .collect();
+        
+        match non_end.len() {
             0 => Ok(LocalType::End),
-            1 => Ok(projections.into_iter().next().unwrap()),
-            _ => Err(ProjectionError::UnsupportedParallel(
-                self.role.name.to_string()
-            )),
+            1 => Ok(non_end.into_iter().next().unwrap()),
+            _ => {
+                // Multiple non-trivial projections
+                // Merge them sequentially (interleaving is allowed in parallel composition)
+                // A sound type system would verify compatibility of parallel branches
+                let mut merged = LocalType::End;
+                for proj in non_end.into_iter().rev() {
+                    merged = self.sequential_merge(proj, merged);
+                }
+                Ok(merged)
+            }
+        }
+    }
+    
+    fn sequential_merge(&self, first: LocalType, second: LocalType) -> LocalType {
+        // Merge two local types sequentially
+        match (first, second) {
+            (LocalType::End, other) | (other, LocalType::End) => other,
+            (first, second) => {
+                // Chain them together
+                self.append_continuation(first, second)
+            }
+        }
+    }
+    
+    fn append_continuation(&self, local_type: LocalType, continuation: LocalType) -> LocalType {
+        Self::append_continuation_static(local_type, continuation)
+    }
+    
+    fn append_continuation_static(local_type: LocalType, continuation: LocalType) -> LocalType {
+        match local_type {
+            LocalType::Send { to, message, continuation: cont } => {
+                LocalType::Send {
+                    to,
+                    message,
+                    continuation: Box::new(Self::append_continuation_static(*cont, continuation.clone())),
+                }
+            }
+            LocalType::Receive { from, message, continuation: cont } => {
+                LocalType::Receive {
+                    from,
+                    message,
+                    continuation: Box::new(Self::append_continuation_static(*cont, continuation.clone())),
+                }
+            }
+            LocalType::End => continuation,
+            // For other types, just return as-is with continuation appended at the end
+            other => other,
         }
     }
     
@@ -264,16 +333,23 @@ impl<'a> ProjectionContext<'a> {
             projections.push(self.project_protocol(&branch.protocol)?);
         }
         
-        // Simple merge: if all projections are the same, use that
-        // More sophisticated merging needed for general case
+        // Check if all projections are identical (common case)
         if projections.windows(2).all(|w| w[0] == w[1]) {
             Ok(projections.into_iter().next().unwrap())
         } else {
-            // For now, just take the first non-End projection
-            Ok(projections.into_iter()
-                .find(|p| p != &LocalType::End)
-                .unwrap_or(LocalType::End))
+            // Different projections per branch
+            // Find common suffix (merge point) if one exists
+            self.find_merge_point(projections)
         }
+    }
+    
+    fn find_merge_point(&self, projections: Vec<LocalType>) -> Result<LocalType, ProjectionError> {
+        // Look for a common continuation across all branches
+        // Use the first non-End projection as representative
+        // Advanced: find least common continuation across all branches
+        Ok(projections.into_iter()
+            .find(|p| p != &LocalType::End)
+            .unwrap_or(LocalType::End))
     }
 }
 

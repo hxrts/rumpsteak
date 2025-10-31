@@ -1,7 +1,7 @@
 // Parser for choreographic protocol syntax
 // This would typically be implemented as a procedural macro
 
-use crate::ast::{Choreography, Protocol, Role, MessageType, Branch};
+use crate::ast::{Choreography, Protocol, Role, MessageType, Branch, Condition};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::format_ident;
 use syn::Result;
@@ -9,7 +9,8 @@ use syn::Result;
 /// Parse a choreographic protocol from a token stream
 /// Supports basic choreography syntax: roles, sends, choices, loops
 pub fn parse_choreography(input: TokenStream) -> Result<Choreography> {
-    // For now, create a simple example choreography since full parsing is complex
+    // Create a simple example choreography
+    // Complete parser implementation would use pest or syn to parse choreography DSL
     let _input = input; // Consume input to avoid warnings
     
     // Create a basic example protocol: A -> B: Message
@@ -143,15 +144,14 @@ struct MessageSpec {
     payload: Option<TokenStream>,
 }
 
-// TODO: Convert parsed input to AST (currently unused)
-/*
+/// Convert parsed choreography input to AST
 impl From<ChoreographyInput> for Choreography {
     fn from(input: ChoreographyInput) -> Self {
         let roles = input.roles.into_iter()
             .map(|r| Role::new(r.name))
             .collect();
         
-        let protocol = convert_statements_to_protocol(input.statements);
+        let protocol = convert_statements_to_protocol(&input.statements, &[]);
         
         Choreography {
             name: input.name,
@@ -161,10 +161,8 @@ impl From<ChoreographyInput> for Choreography {
         }
     }
 }
-*/
 
-/*
-fn convert_statements_to_protocol(statements: Vec<Statement>) -> Protocol {
+fn convert_statements_to_protocol(statements: &[Statement], _roles: &[Role]) -> Protocol {
     if statements.is_empty() {
         return Protocol::End;
     }
@@ -172,15 +170,15 @@ fn convert_statements_to_protocol(statements: Vec<Statement>) -> Protocol {
     let mut current = Protocol::End;
     
     // Build protocol from back to front
-    for statement in statements.into_iter().rev() {
+    for statement in statements.iter().rev() {
         current = match statement {
             Statement::Send { from, to, message } => {
                 Protocol::Send {
-                    from: Role::new(from),
-                    to: Role::new(to),
+                    from: Role::new(from.clone()),
+                    to: Role::new(to.clone()),
                     message: MessageType {
-                        name: message.name,
-                        payload: message.payload,
+                        name: message.name.clone(),
+                        payload: message.payload.clone(),
                     },
                     continuation: Box::new(current),
                 }
@@ -188,43 +186,43 @@ fn convert_statements_to_protocol(statements: Vec<Statement>) -> Protocol {
             Statement::Broadcast { from, message } => {
                 // In a real implementation, we'd resolve * to all other roles
                 Protocol::Broadcast {
-                    from: Role::new(from),
+                    from: Role::new(from.clone()),
                     to_all: vec![], // Would be filled with actual roles
                     message: MessageType {
-                        name: message.name,
-                        payload: message.payload,
+                        name: message.name.clone(),
+                        payload: message.payload.clone(),
                     },
                     continuation: Box::new(current),
                 }
             }
             Statement::Choice { role, branches } => {
                 Protocol::Choice {
-                    role: Role::new(role),
-                    branches: branches.into_iter()
-                        .map(|(label, stmts)| Branch {
-                            label,
-                            protocol: convert_statements_to_protocol(stmts),
+                    role: Role::new(role.clone()),
+                    branches: branches.iter()
+                        .map(|b| Branch {
+                            label: b.label.clone(),
+                            protocol: convert_statements_to_protocol(&b.statements, _roles),
                         })
                         .collect(),
                 }
             }
             Statement::Loop { condition, body } => {
                 Protocol::Loop {
-                    condition: condition.map(|_| Condition::Count(1)), // Simplified
-                    body: Box::new(convert_statements_to_protocol(body)),
+                    condition: condition.as_ref().map(|_| Condition::Count(1)), // Simplified
+                    body: Box::new(convert_statements_to_protocol(body, _roles)),
                 }
             }
             Statement::Parallel { branches } => {
                 Protocol::Parallel {
-                    protocols: branches.into_iter()
-                        .map(convert_statements_to_protocol)
+                    protocols: branches.iter()
+                        .map(|b| convert_statements_to_protocol(b, _roles))
                         .collect(),
                 }
             }
             Statement::Rec { label, body } => {
                 Protocol::Rec {
-                    label,
-                    body: Box::new(convert_statements_to_protocol(body)),
+                    label: label.clone(),
+                    body: Box::new(convert_statements_to_protocol(body, _roles)),
                 }
             }
         };
@@ -232,7 +230,6 @@ fn convert_statements_to_protocol(statements: Vec<Statement>) -> Protocol {
     
     current
 }
-*/
 
 // Example of how the macro would work
 #[doc(hidden)]

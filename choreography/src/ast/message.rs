@@ -1,11 +1,35 @@
-// Message type definitions
+//! Message type definitions for choreographic protocols
 
 use proc_macro2::{Ident, TokenStream};
 
 /// Message type with optional payload
+///
+/// Represents a message that can be sent between roles in a choreography.
+/// Messages have a name and an optional payload type.
+///
+/// # Examples
+///
+/// ```ignore
+/// use quote::{format_ident, quote};
+/// use rumpsteak_choreography::MessageType;
+///
+/// // Simple message without payload
+/// let ping = MessageType {
+///     name: format_ident!("Ping"),
+///     payload: None,
+/// };
+///
+/// // Message with payload
+/// let request = MessageType {
+///     name: format_ident!("Request"),
+///     payload: Some(quote! { String }),
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct MessageType {
+    /// The name identifier of the message
     pub name: Ident,
+    /// Optional payload type (as token stream)
     pub payload: Option<TokenStream>,
 }
 
