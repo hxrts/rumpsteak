@@ -43,7 +43,9 @@ type Client = Send<S, Hello, Select<S, ClientChoice>>;
 
 #[session]
 enum ClientChoice {
+    #[allow(dead_code)]
     Add(Add, Send<S, Add, Receive<S, Sum, Select<S, ClientChoice>>>),
+    #[allow(dead_code)]
     Bye(Bye, Receive<S, Bye, End>),
 }
 

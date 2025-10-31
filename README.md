@@ -5,40 +5,40 @@
 [![Docs](https://docs.rs/rumpsteak/badge.svg)](https://docs.rs/rumpsteak)
 [![License](https://img.shields.io/crates/l/rumpsteak)](LICENSE)
 
-> :warning: Rumpsteak is currently a work in progress and the API is likely to
-> dramatically change. Feel free to try out examples but please do not yet use
-> Rumpsteak for any production applications!
-
 Rumpsteak is a Rust framework for _safely_ and _efficiently_ implementing
 [message-passing](https://doc.rust-lang.org/book/ch16-02-message-passing.html)
 [asynchronous](https://rust-lang.github.io/async-book/) programs. It uses
-multiparty session types to statically guarantee the absence of communication
-errors such as deadlocks and asynchronous subtyping to allow optimizing
-communications.
+multiparty session types to statically guarantee the absence of communication errors such as deadlocks and asynchronous subtyping to allow optimizing communications.
 
-Multiparty session types (MPST) verify the safety of message-passing protocols,
-as described in [A Very Gentle Introduction to Multiparty Session
-Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
+Multiparty session types (MPST) verify the safety of message-passing protocols, as described in [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
 Asynchronous subtyping, introduced for MPST in [Precise Subtyping for
-Asynchronous Multiparty
-Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf),
-verifies the reordering of messages to create more optimized implementations
-than are usually possible with MPST.
+Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf),
+verifies the reordering of messages to create more optimized implementations than are usually possible with MPST.
 
 ## Features
 
-- [x] Provides deadlock-free communication.
-- [x] Integrates with `async`/`await` code.
-- [x] Supports any number of participants.
-- [x] Includes benchmarks to track performance.
+- Deadlock-free communication with session types.
+- Integrates with `async`/`await` code.
+- Supports any number of participants.
+- Choreographic programming with DSL parser and automatic projection.
+- Effect handler system with multiple implementations (in-memory, distributed).
+- Production-ready RumpsteakHandler with session state tracking.
+- Middleware support (tracing, retry, metrics, fault injection).
+- WebAssembly (WASM) support for browser-based protocols.
 
 ## Usage
 
-Add the following to your `Cargo.toml` file.
+This is the Aura fork of Rumpsteak with enhanced choreographic programming support.
 
 ```toml
 [dependencies]
-rumpsteak = "0.1"
+rumpsteak-aura = { git = "https://github.com/aura-project/rumpsteak-aura" }
+```
+
+For choreographic programming:
+```toml
+[dependencies]
+rumpsteak-choreography = { git = "https://github.com/aura-project/rumpsteak-aura" }
 ```
 
 ## Example
@@ -114,34 +114,54 @@ fn main() {
 
 ## Structure
 
-#### `benches/`
-
-Benchmark suite to track Rumpsteak's performance over time.
-
 #### `caching/`
 
 HTTP cache case study backed by Redis.
 
-#### `comparison/`
+#### `choreography/`
 
-Comparison with some other Rust implementations of session types.
+Choreographic programming layer enabling global protocol specification with automatic projection to local session types. Includes:
+- DSL Parser: Pest-based parser for `.choreography` files with protocol composition, guards, annotations, and parameterized roles
+- Effect Handler System: Transport-agnostic protocol implementations with middleware support
+- Multiple Handlers: `InMemoryHandler` for testing, `RumpsteakHandler` for production distributed execution
+- Session State Tracking: Metadata tracking for debugging and monitoring
+- Complete Documentation: Comprehensive guides in `docs/` directory
+- WebAssembly Support: Works in browser environments
+
+*This is the primary extension of the original version with significant enhancements.*
 
 #### `examples/`
 
-Many examples of using Rumpsteak from popular protocols.
+Many examples of using Rumpsteak from popular protocols. *Updated to use new APIs*. Includes `wasm-ping-pong/` demonstrating browser-based protocols.
 
-#### `generate/`
+#### `fsm/`
 
-Automatic code generation from finite state machines to Rumpsteak's API.
+Finite state machine support for session types, including DOT parsing and subtyping verification.
 
 #### `macros/`
 
 Crate for procedural macros used within Rumpsteak's API.
 
-#### `oneshot/`
+## WebAssembly Support
 
-Outdated experimental implementation of using one-shot channels for communication.
+Rumpsteak now supports compilation to WebAssembly! The core session types and choreography system can run in browser environments. See `examples/wasm-ping-pong/` for a complete example and `docs/WASM_IMPLEMENTATION_SUMMARY.md` for implementation details.
 
-## Licensing
+Key features:
+- Core session types compile to WASM
+- Effect handlers work in browser
+- Platform-agnostic runtime abstraction
+- Example with browser deployment
+- Supports custom network transports - Implement `ChoreoHandler` with WebSockets, WebRTC, etc.
+
+Quick start:
+```bash
+cd examples/wasm-ping-pong
+./build.sh  # or: wasm-pack build --target web
+# Serve and open in browser
+```
+
+Custom network handlers: See `docs/07_wasm_guide.md` for implementing WebSocket/WebRTC handlers for real distributed protocols in WASM.
+
+## License
 
 Licensed under the MIT license. See the [LICENSE](LICENSE) file for details.

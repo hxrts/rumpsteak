@@ -20,7 +20,7 @@ use std::fmt::{self, Display, Formatter};
 /// ```rust
 /// use rumpsteak_fsm::{Fsm, Dot};
 ///
-/// let fsm = Fsm::new("Client");
+/// let fsm: Fsm<&str, &str, &str> = Fsm::new("Client");
 /// let dot = Dot::new(&fsm);
 /// println!("{}", dot);
 /// ```

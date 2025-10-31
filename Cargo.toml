@@ -1,75 +1,68 @@
 [package]
 name = "rumpsteak-aura"
 version = "0.1.1-aura"
-authors = ["Zak Cutner <me@zakcutner.uk>", "Aura Team"]
+authors = ["Zak Cutner <me@zakcutner.uk>", "Sam Hart <sam@hxrts.com>"]
 edition = "2021"
 rust-version = "1.75"
-description = "Session types for asynchronous communication between multiple parties - Aura fork for threshold cryptography choreographies."
+description = "Session types for asynchronous communication between multiple parties (Aura flavored)."
 readme = "README.md"
 repository = "https://github.com/aura-project/rumpsteak-aura"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]
 
 [lib]
 bench = false
 
-[[bench]]
-name = "double_buffering"
-harness = false
-
-[[bench]]
-name = "ring"
-harness = false
-
-[[bench]]
-name = "subtype"
-harness = false
-required-features = ["serialize"]
-
-[[bench]]
-name = "three_adder"
-harness = false
-
 [dependencies]
-futures = "0.3"
-time = { version = "0.3", features = ["serde"] }
-base64 = "0.21"
-hex = "0.4"
-rumpsteak-fsm = { path = "fsm", version = "0.1", optional = true }
-rumpsteak-macros = { path = "macros", version = "0.1" }
-thiserror = "1.0"
-anyhow = "1.0"
-tokio = { version = "1.35", features = ["full"] }
-async-trait = "0.1"
-serde = { version = "1.0", features = ["derive"] }
-uuid = { version = "1.6", features = ["v4", "serde"] }
-tracing = "0.1"
-bincode = "1.3"
+futures = { workspace = true }
+time = { workspace = true }
+base64 = { workspace = true }
+hex = { workspace = true }
+rumpsteak-fsm = { path = "fsm", optional = true }
+rumpsteak-macros = { path = "macros" }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+wasm-timer = { workspace = true }
+getrandom = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+uuid = { workspace = true }
+tracing = { workspace = true }
+bincode = { workspace = true }
 # Dependencies for choreography module
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "2.0", features = ["full", "extra-traits"] }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
 # Optional dependencies
-rand = { version = "0.8", optional = true }
+rand = { workspace = true, optional = true }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = { workspace = true }
 rumpsteak-choreography = { path = "choreography", version = "0.1.1-aura" }
-futures = { version = "0.3", features = ["thread-pool"] }
+futures = { workspace = true, features = ["thread-pool"] }
 num-complex = "0.4"
-rand = "0.8"
+rand = { workspace = true }
 rumpsteak-fsm = { path = "fsm", features = ["subtyping"] }
-rumpsteak-oneshot = { path = "oneshot" }
-tempfile = "3.2"
-tokio = { version = "1.35", features = ["macros", "rt", "time"] }
-proptest = "1.4"
-anyhow = "1.0"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
+proptest = { workspace = true }
+anyhow = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [features]
+default = []
 serialize = ["rumpsteak-fsm", "rumpsteak-macros/serialize"]
 test-utils = ["rand"]
+wasm = ["getrandom/js"]
 
 [profile.release]
 debug = true
@@ -78,9 +71,55 @@ debug = true
 debug = true
 
 [workspace]
-members = ["caching", "fsm", "macros", "oneshot", "choreography"]
-# Note: "generate" excluded due to dot-parser API compatibility issues
-# Note: "comparison" excluded - requires nightly Rust features not available in stable
+members = ["caching", "fsm", "macros", "choreography"]
+exclude = ["examples/wasm-ping-pong"]
+
+# Shared dependencies across workspace members
+[workspace.dependencies]
+# Core async/concurrency
+futures = "0.3"
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+async-recursion = "1.0"
+
+# WASM support
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+wasm-timer = "0.2"
+getrandom = { version = "0.2", features = ["js"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+time = { version = "0.3", features = ["serde"] }
+base64 = "0.21"
+hex = "0.4"
+uuid = { version = "1.6", features = ["v4", "serde", "js"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Proc macros
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+
+# Logging/tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+rand = "0.8"
+
+# Parsing
+pest = "2.7"
+pest_derive = "2.7"
+
+# Testing
+criterion = "0.3"
+proptest = "1.4"
+tempfile = "3.2"
 
 # Align with Aura project standards
 [workspace.lints.clippy]

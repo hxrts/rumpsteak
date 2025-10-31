@@ -13,7 +13,7 @@ pub enum Protocol {
         message: MessageType,
         continuation: Box<Protocol>,
     },
-    
+
     /// Broadcast: A -> *: Message
     Broadcast {
         from: Role,
@@ -21,33 +21,25 @@ pub enum Protocol {
         message: MessageType,
         continuation: Box<Protocol>,
     },
-    
+
     /// Choice made by a role
-    Choice {
-        role: Role,
-        branches: Vec<Branch>,
-    },
-    
+    Choice { role: Role, branches: Vec<Branch> },
+
     /// Loop construct
     Loop {
         condition: Option<Condition>,
         body: Box<Protocol>,
     },
-    
+
     /// Parallel composition
-    Parallel {
-        protocols: Vec<Protocol>,
-    },
-    
+    Parallel { protocols: Vec<Protocol> },
+
     /// Recursive protocol with label
-    Rec {
-        label: Ident,
-        body: Box<Protocol>,
-    },
-    
+    Rec { label: Ident, body: Box<Protocol> },
+
     /// Reference to recursive label
     Var(Ident),
-    
+
     /// Protocol termination
     End,
 }
@@ -56,6 +48,7 @@ pub enum Protocol {
 #[derive(Debug, Clone)]
 pub struct Branch {
     pub label: Ident,
+    pub guard: Option<TokenStream>,
     pub protocol: Protocol,
 }
 
@@ -73,27 +66,36 @@ pub enum Condition {
 impl Protocol {
     pub fn mentions_role(&self, role: &Role) -> bool {
         match self {
-            Protocol::Send { from, to, continuation, .. } => {
-                from == role || to == role || continuation.mentions_role(role)
-            }
-            Protocol::Broadcast { from, to_all, continuation, .. } => {
-                from == role || to_all.contains(role) || continuation.mentions_role(role)
-            }
+            Protocol::Send {
+                from,
+                to,
+                continuation,
+                ..
+            } => from == role || to == role || continuation.mentions_role(role),
+            Protocol::Broadcast {
+                from,
+                to_all,
+                continuation,
+                ..
+            } => from == role || to_all.contains(role) || continuation.mentions_role(role),
             Protocol::Choice { role: r, branches } => {
                 r == role || branches.iter().any(|b| b.protocol.mentions_role(role))
             }
             Protocol::Loop { body, .. } => body.mentions_role(role),
-            Protocol::Parallel { protocols } => {
-                protocols.iter().any(|p| p.mentions_role(role))
-            }
+            Protocol::Parallel { protocols } => protocols.iter().any(|p| p.mentions_role(role)),
             Protocol::Rec { body, .. } => body.mentions_role(role),
             Protocol::Var(_) | Protocol::End => false,
         }
     }
-    
+
     pub(crate) fn validate(&self, roles: &[Role]) -> Result<(), ValidationError> {
         match self {
-            Protocol::Send { from, to, continuation, .. } => {
+            Protocol::Send {
+                from,
+                to,
+                continuation,
+                ..
+            } => {
                 if !roles.contains(from) {
                     return Err(ValidationError::UndefinedRole(from.name.to_string()));
                 }
@@ -102,7 +104,12 @@ impl Protocol {
                 }
                 continuation.validate(roles)
             }
-            Protocol::Broadcast { from, to_all, continuation, .. } => {
+            Protocol::Broadcast {
+                from,
+                to_all,
+                continuation,
+                ..
+            } => {
                 if !roles.contains(from) {
                     return Err(ValidationError::UndefinedRole(from.name.to_string()));
                 }
@@ -141,4 +148,3 @@ impl Protocol {
         }
     }
 }
-

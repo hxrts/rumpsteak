@@ -15,33 +15,57 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [dependencies]
-rumpsteak-aura = { path = "..", version = "0.1.1-aura" }
-rumpsteak-macros = { path = "../macros", version = "0.1" }
-futures = "0.3"
-tokio = { version = "1.35", features = ["full"] }
-async-trait = "0.1"
-async-recursion = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-tracing = "0.1"
-anyhow = "1.0"
-thiserror = "1.0"
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "2.0", features = ["full"] }
-bincode = "1.3"
-time = { version = "0.3", features = ["serde"] }
-base64 = "0.21"
-hex = "0.4"
-uuid = { version = "1.6", features = ["v4", "serde"] }
+rumpsteak-aura = { path = ".." }
+rumpsteak-macros = { path = "../macros" }
+futures = { workspace = true }
+async-trait = { workspace = true }
+async-recursion = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+bincode = { workspace = true }
+time = { workspace = true }
+base64 = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+pest = { workspace = true }
+pest_derive = { workspace = true }
 
 # Optional dependencies
-rand = { version = "0.8", optional = true }
+rand = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+wasm-timer = { workspace = true }
+getrandom = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.3"
-proptest = "1.4"
-tempfile = "3.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+criterion = { workspace = true }
+proptest = { workspace = true }
+tempfile = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
 
 [features]
+default = []
 test-utils = ["rand"]
+wasm = ["getrandom/js"]
+
+[[bench]]
+name = "choreography_bench"
+harness = false
+
+[[bench]]
+name = "rumpsteak_handler_bench"
+harness = false

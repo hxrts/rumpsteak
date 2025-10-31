@@ -219,5 +219,6 @@ async fn elevator(role: &mut E) -> Result<Never> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let Roles(mut u, mut d, mut e) = Roles::default();
+    #[allow(unreachable_code)]
     try_join!(user(&mut u), door(&mut d), elevator(&mut e)).unwrap();
 }

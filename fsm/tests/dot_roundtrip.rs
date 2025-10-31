@@ -26,7 +26,7 @@ fn test_simple_adder_client_parse() {
 
     let mut fsms = parse(dot_content);
     let fsm = fsms.next().expect("should have one FSM");
-    
+
     match fsm {
         Ok(fsm) => {
             // Verify basic properties
@@ -37,7 +37,7 @@ fn test_simple_adder_client_parse() {
         }
         Err(e) => panic!("Failed to parse DOT file: {}", e),
     }
-    
+
     // Verify there are no more FSMs
     assert!(fsms.next().is_none(), "should only have one FSM");
 }
@@ -60,7 +60,7 @@ fn test_simple_adder_server_parse() {
 
     let mut fsms = parse(dot_content);
     let fsm = fsms.next().expect("should have one FSM");
-    
+
     match fsm {
         Ok(fsm) => {
             // Verify basic properties
@@ -71,7 +71,7 @@ fn test_simple_adder_server_parse() {
         }
         Err(e) => panic!("Failed to parse DOT file: {}", e),
     }
-    
+
     // Verify there are no more FSMs
     assert!(fsms.next().is_none(), "should only have one FSM");
 }
@@ -89,15 +89,21 @@ fn test_dot_generation() {
   }"#;
 
     let mut fsms = parse(dot_content);
-    let fsm = fsms.next().expect("should have one FSM").expect("should parse successfully");
-    
+    let fsm = fsms
+        .next()
+        .expect("should have one FSM")
+        .expect("should parse successfully");
+
     // Generate DOT from the FSM
     let generated = format!("{}", Dot::new(&fsm));
-    
+
     // Parse the generated DOT
     let mut fsms2 = parse(&generated);
-    let fsm2 = fsms2.next().expect("should have one FSM").expect("should parse successfully");
-    
+    let fsm2 = fsms2
+        .next()
+        .expect("should have one FSM")
+        .expect("should parse successfully");
+
     // Verify they have the same structure
     assert_eq!(fsm.role(), fsm2.role());
     assert_eq!(fsm.size(), fsm2.size());
@@ -121,15 +127,19 @@ digraph B {
 }"#;
 
     let fsms: Vec<_> = parse(dot_content).collect();
-    
+
     assert_eq!(fsms.len(), 2, "should have two FSMs");
-    
+
     // Check first FSM
-    let fsm_a = fsms[0].as_ref().expect("first FSM should parse successfully");
+    let fsm_a = fsms[0]
+        .as_ref()
+        .expect("first FSM should parse successfully");
     assert_eq!(fsm_a.role(), "A");
-    
+
     // Check second FSM
-    let fsm_b = fsms[1].as_ref().expect("second FSM should parse successfully");
+    let fsm_b = fsms[1]
+        .as_ref()
+        .expect("second FSM should parse successfully");
     assert_eq!(fsm_b.role(), "B");
 }
 
@@ -141,8 +151,11 @@ fn test_empty_fsm() {
 }"#;
 
     let mut fsms = parse(dot_content);
-    let fsm = fsms.next().expect("should have one FSM").expect("should parse successfully");
-    
+    let fsm = fsms
+        .next()
+        .expect("should have one FSM")
+        .expect("should parse successfully");
+
     assert_eq!(fsm.role(), "Empty");
     let (states, transitions) = fsm.size();
     assert_eq!(states, 1, "should have 1 state");
@@ -154,4 +167,3 @@ fn test_empty_fsm() {
 fn parsing_feature_disabled() {
     println!("DOT parsing tests require the 'parsing' feature to be enabled");
 }
-

@@ -29,9 +29,9 @@
 //! ```
 
 use async_trait::async_trait;
-use serde::{Serialize, de::DeserializeOwned};
-use std::time::Duration;
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
+use std::time::Duration;
 use thiserror::Error;
 
 /// Trait for role identifiers in choreographies
@@ -61,19 +61,19 @@ pub enum ChoreographyError {
     /// Transport-layer error (network, channel failure, etc.)
     #[error("Transport error: {0}")]
     Transport(String),
-    
+
     /// Message serialization/deserialization error
     #[error("Serialization error: {0}")]
     Serialization(String),
-    
+
     /// Operation exceeded the specified timeout
     #[error("Timeout after {0:?}")]
     Timeout(Duration),
-    
+
     /// Protocol specification was violated at runtime
     #[error("Protocol violation: {0}")]
     ProtocolViolation(String),
-    
+
     /// Referenced role not found in the choreography
     #[error("Role {0:?} not found in this choreography")]
     UnknownRole(String),
@@ -107,10 +107,10 @@ pub trait ChoreoHandler: Send {
     /// * `to` - The recipient role
     /// * `msg` - The message to send (must be serializable)
     async fn send<M: Serialize + Send + Sync>(
-        &mut self, 
-        ep: &mut Self::Endpoint, 
-        to: Self::Role, 
-        msg: &M
+        &mut self,
+        ep: &mut Self::Endpoint,
+        to: Self::Role,
+        msg: &M,
     ) -> Result<()>;
 
     /// Receive a strongly-typed message from a specific role
@@ -124,9 +124,9 @@ pub trait ChoreoHandler: Send {
     ///
     /// The received message of type `M`
     async fn recv<M: DeserializeOwned + Send>(
-        &mut self, 
-        ep: &mut Self::Endpoint, 
-        from: Self::Role
+        &mut self,
+        ep: &mut Self::Endpoint,
+        from: Self::Role,
     ) -> Result<M>;
 
     /// Internal choice: broadcast a label selection
@@ -139,10 +139,10 @@ pub trait ChoreoHandler: Send {
     /// * `who` - The role making the choice (usually the current role)
     /// * `label` - The selected branch label
     async fn choose(
-        &mut self, 
-        ep: &mut Self::Endpoint, 
-        who: Self::Role, 
-        label: Label
+        &mut self,
+        ep: &mut Self::Endpoint,
+        who: Self::Role,
+        label: Label,
     ) -> Result<()>;
 
     /// External choice: receive a label selection
@@ -157,11 +157,7 @@ pub trait ChoreoHandler: Send {
     /// # Returns
     ///
     /// The label selected by the choosing role
-    async fn offer(
-        &mut self, 
-        ep: &mut Self::Endpoint, 
-        from: Self::Role
-    ) -> Result<Label>;
+    async fn offer(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<Label>;
 
     /// Execute a future with a timeout
     ///
@@ -184,7 +180,7 @@ pub trait ChoreoHandler: Send {
     ) -> Result<T>
     where
         F: std::future::Future<Output = Result<T>> + Send;
-        
+
     /// Broadcast a message to multiple recipients
     ///
     /// Default implementation sends sequentially. Override for optimized broadcasting.
@@ -199,7 +195,7 @@ pub trait ChoreoHandler: Send {
         }
         Ok(())
     }
-    
+
     /// Send messages to multiple recipients in parallel
     ///
     /// Default implementation sends sequentially. Override for true parallelism.
@@ -224,18 +220,12 @@ pub trait ChoreoHandlerExt: ChoreoHandler {
     /// Setup phase - establish connections, initialize state
     ///
     /// Called before protocol execution begins.
-    async fn setup(
-        &mut self, 
-        role: Self::Role
-    ) -> Result<Self::Endpoint>;
-    
+    async fn setup(&mut self, role: Self::Role) -> Result<Self::Endpoint>;
+
     /// Teardown phase - close connections, cleanup
     ///
     /// Called after protocol execution completes.
-    async fn teardown(
-        &mut self, 
-        ep: Self::Endpoint
-    ) -> Result<()>;
+    async fn teardown(&mut self, ep: Self::Endpoint) -> Result<()>;
 }
 
 /// A no-op handler for testing pure choreographic logic
@@ -267,37 +257,37 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
     type Endpoint = ();
 
     async fn send<M: Serialize + Send + Sync>(
-        &mut self, 
-        _ep: &mut Self::Endpoint, 
-        _to: Self::Role, 
-        _msg: &M
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        _to: Self::Role,
+        _msg: &M,
     ) -> Result<()> {
         Ok(())
     }
 
     async fn recv<M: DeserializeOwned + Send>(
-        &mut self, 
-        _ep: &mut Self::Endpoint, 
-        _from: Self::Role
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        _from: Self::Role,
     ) -> Result<M> {
-        Err(ChoreographyError::Transport("NoOpHandler cannot receive".into()))
+        Err(ChoreographyError::Transport(
+            "NoOpHandler cannot receive".into(),
+        ))
     }
 
     async fn choose(
-        &mut self, 
-        _ep: &mut Self::Endpoint, 
-        _who: Self::Role, 
-        _label: Label
+        &mut self,
+        _ep: &mut Self::Endpoint,
+        _who: Self::Role,
+        _label: Label,
     ) -> Result<()> {
         Ok(())
     }
 
-    async fn offer(
-        &mut self, 
-        _ep: &mut Self::Endpoint, 
-        _from: Self::Role
-    ) -> Result<Label> {
-        Err(ChoreographyError::Transport("NoOpHandler cannot offer".into()))
+    async fn offer(&mut self, _ep: &mut Self::Endpoint, _from: Self::Role) -> Result<Label> {
+        Err(ChoreographyError::Transport(
+            "NoOpHandler cannot offer".into(),
+        ))
     }
 
     async fn with_timeout<F, T>(
@@ -308,7 +298,7 @@ impl<R: RoleId + 'static> ChoreoHandler for NoOpHandler<R> {
         body: F,
     ) -> Result<T>
     where
-        F: std::future::Future<Output = Result<T>> + Send
+        F: std::future::Future<Output = Result<T>> + Send,
     {
         body.await
     }

@@ -3,9 +3,13 @@
 //! This module provides the implementation of the `choreography!` macro,
 //! which allows defining multiparty protocols from a global viewpoint.
 
-use proc_macro2::{TokenStream, Ident};
+use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{Error, Result, parse::{Parse, ParseStream}, Token, braced, parenthesized, LitStr};
+use syn::{
+    braced, parenthesized,
+    parse::{Parse, ParseStream},
+    Error, LitStr, Result, Token,
+};
 
 /// Main entry point for the choreography! macro.
 ///
@@ -17,28 +21,28 @@ pub fn choreography(input: TokenStream) -> Result<TokenStream> {
         // Use the DSL parser
         return choreography_from_dsl_string(lit_str.value());
     }
-    
+
     // Otherwise, fall back to syn-based parsing
     let protocol: ProtocolDef = syn::parse2(input)?;
-    
+
     // Generate role structs
     let role_structs = generate_role_structs(&protocol);
-    
+
     // Generate message types
     let message_types = generate_message_types(&protocol);
-    
+
     // Generate session types for each role
     let session_types = generate_session_types(&protocol)?;
-    
+
     // Generate setup function
     let setup_fn = generate_setup_function(&protocol);
-    
+
     // Generate use statements for the necessary imports
     let imports = quote! {
         use ::rumpsteak_aura::{channel, Message as MessageTrait, Role as RoleTrait, Roles as RolesTrait};
         use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
     };
-    
+
     Ok(quote! {
         #imports
         #role_structs
@@ -56,7 +60,7 @@ fn choreography_from_dsl_string(_dsl: String) -> Result<TokenStream> {
     // 2. Project to local types for each role
     // 3. Generate code for the session types
     // For now, we'll return a compile-time note
-    
+
     Ok(quote! {
         compile_error!("Full DSL parser integration is planned. For now, use the explicit syntax without string literals.");
     })
@@ -115,10 +119,10 @@ impl Parse for ProtocolDef {
             return Err(Error::new(protocol_ident.span(), "expected 'protocol'"));
         }
         let name: Ident = input.parse()?;
-        
+
         let content;
         braced!(content in input);
-        
+
         // Parse roles
         let mut roles = Vec::new();
         if content.peek(syn::Ident) {
@@ -127,14 +131,14 @@ impl Parse for ProtocolDef {
                 return Err(Error::new(roles_ident.span(), "expected 'roles'"));
             }
             let _: Token![:] = content.parse()?;
-            
+
             loop {
                 let role_name: Ident = content.parse()?;
                 roles.push(RoleDef {
                     name: role_name,
                     params: None,
                 });
-                
+
                 if content.peek(Token![;]) {
                     let _: Token![;] = content.parse()?;
                     break;
@@ -142,13 +146,13 @@ impl Parse for ProtocolDef {
                 let _: Token![,] = content.parse()?;
             }
         }
-        
+
         // Parse interactions
         let mut interactions = Vec::new();
         while !content.is_empty() {
             interactions.push(parse_interaction(&content)?);
         }
-        
+
         Ok(ProtocolDef {
             name,
             roles,
@@ -165,7 +169,7 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
         let to: Ident = input.parse()?;
         let _: Token![:] = input.parse()?;
         let message: Ident = input.parse()?;
-        
+
         let payload = if input.peek(syn::token::Paren) {
             let content;
             parenthesized!(content in input);
@@ -173,9 +177,9 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
         } else {
             Box::new(None)
         };
-        
+
         let _: Token![;] = input.parse()?;
-        
+
         return Ok(Interaction::Send {
             from,
             to,
@@ -183,7 +187,7 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
             payload,
         });
     }
-    
+
     Err(Error::new(input.span(), "expected interaction"))
 }
 
@@ -191,7 +195,7 @@ fn parse_interaction(input: ParseStream) -> Result<Interaction> {
 fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
     let role_names: Vec<_> = protocol.roles.iter().map(|r| &r.name).collect();
     let _n = protocol.roles.len();
-    
+
     // Generate route attributes for each role
     let mut role_structs = Vec::new();
     for (i, role) in role_names.iter().enumerate() {
@@ -202,7 +206,7 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
                 routes.push(quote! { #[route(#other)] });
             }
         }
-        
+
         // For simplicity, just use first route for bidirectional channel
         let route = if !routes.is_empty() {
             let other = &role_names[(i + 1) % role_names.len()];
@@ -210,19 +214,19 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
         } else {
             quote! {}
         };
-        
+
         role_structs.push(quote! {
             #[derive(::rumpsteak_aura::Role)]
             #[message(Label)]
             pub struct #role(#route Channel);
         });
     }
-    
+
     quote! {
         type Channel = ::rumpsteak_aura::channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-        
+
         #(#role_structs)*
-        
+
         /// Roles tuple for protocol setup
         #[derive(::rumpsteak_aura::Roles)]
         pub struct Roles(#(#role_names),*);
@@ -232,34 +236,40 @@ fn generate_role_structs(protocol: &ProtocolDef) -> TokenStream {
 /// Generate message types
 fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
     let mut messages = Vec::new();
-    
+
     // Extract messages from interactions
     for interaction in &protocol.interactions {
-        if let Interaction::Send { message, payload, .. } = interaction {
+        if let Interaction::Send {
+            message, payload, ..
+        } = interaction
+        {
             messages.push((message, payload.as_ref().as_ref()));
         }
     }
-    
-    let message_structs: Vec<_> = messages.iter().map(|(name, payload)| {
-        if let Some(ty) = payload {
-            quote! {
-                #[derive(Clone, Debug)]
-                pub struct #name(pub #ty);
+
+    let message_structs: Vec<_> = messages
+        .iter()
+        .map(|(name, payload)| {
+            if let Some(ty) = payload {
+                quote! {
+                    #[derive(Clone, Debug)]
+                    pub struct #name(pub #ty);
+                }
+            } else {
+                quote! {
+                    #[derive(Clone, Debug)]
+                    pub struct #name;
+                }
             }
-        } else {
-            quote! {
-                #[derive(Clone, Debug)]
-                pub struct #name;
-            }
-        }
-    }).collect();
-    
+        })
+        .collect();
+
     let message_names: Vec<_> = messages.iter().map(|(name, _)| name).collect();
-    
+
     quote! {
         /// Generated message types
         #(#message_structs)*
-        
+
         /// Message enum for the protocol
         #[derive(::rumpsteak_aura::Message)]
         pub enum Label {
@@ -271,30 +281,32 @@ fn generate_message_types(protocol: &ProtocolDef) -> TokenStream {
 /// Generate session types for each role
 fn generate_session_types(protocol: &ProtocolDef) -> Result<TokenStream> {
     let mut types = TokenStream::new();
-    
+
     // For each role, generate its session type
     for role in &protocol.roles {
         let role_name = &role.name;
         let session_type = project_role(protocol, role)?;
-        
+
         let session_type_name = quote::format_ident!("{}Session", role_name);
         types.extend(quote! {
             #[::rumpsteak_aura::session]
             pub type #session_type_name = #session_type;
         });
     }
-    
+
     Ok(types)
 }
 
 /// Project the protocol to a specific role's session type
 fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
     let mut type_expr = quote! { ::rumpsteak_aura::End };
-    
+
     // Process interactions in reverse order to build the type
     for interaction in protocol.interactions.iter().rev() {
         match interaction {
-            Interaction::Send { from, to, message, .. } => {
+            Interaction::Send {
+                from, to, message, ..
+            } => {
                 if from == &role.name {
                     // This role sends
                     type_expr = quote! {
@@ -308,7 +320,10 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
                 }
                 // Otherwise, this role doesn't participate
             }
-            Interaction::Choice { role: choosing_role, branches } => {
+            Interaction::Choice {
+                role: choosing_role,
+                branches,
+            } => {
                 // Handle choice: the choosing role offers branches, others receive the choice
                 if choosing_role == &role.name {
                     // This role makes the choice
@@ -337,15 +352,18 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
                         }
                         quote! { ::rumpsteak_aura::Choose<#label, #branch_type> }
                     }).collect();
-                    
+
                     // Combine branches into a choice type (sum type)
                     if !branch_types.is_empty() {
-                        type_expr = branch_types.into_iter().fold(None, |acc, branch| {
-                            match acc {
+                        type_expr = branch_types
+                            .into_iter()
+                            .fold(None, |acc, branch| match acc {
                                 None => Some(branch),
-                                Some(prev) => Some(quote! { ::rumpsteak_aura::Branch<#prev, #branch> }),
-                            }
-                        }).unwrap();
+                                Some(prev) => {
+                                    Some(quote! { ::rumpsteak_aura::Branch<#prev, #branch> })
+                                }
+                            })
+                            .unwrap();
                     }
                 } else {
                     // This role offers (receives the choice from choosing_role)
@@ -374,7 +392,7 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
                         }
                         quote! { #label => #branch_type }
                     }).collect();
-                    
+
                     if !branch_types.is_empty() {
                         type_expr = quote! {
                             ::rumpsteak_aura::Offer<#choosing_role, { #(#branch_types),* }>
@@ -384,7 +402,7 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
             }
         }
     }
-    
+
     Ok(type_expr)
 }
 
@@ -392,7 +410,7 @@ fn project_role(protocol: &ProtocolDef, role: &RoleDef) -> Result<TokenStream> {
 fn generate_setup_function(protocol: &ProtocolDef) -> TokenStream {
     let _n = protocol.roles.len();
     let _protocol_name = &protocol.name;
-    
+
     quote! {
         /// Setup function for the #protocol_name protocol
         pub fn setup() -> Roles {

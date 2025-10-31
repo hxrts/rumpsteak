@@ -23,10 +23,10 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
         Data::Struct(input) => Ok(&input.fields),
         _ => Err(Error::new_spanned(&input, "expected a struct")),
     }?;
-    
+
     // Collect field identifiers for seal/is_sealed implementations
     let mut field_idents = Vec::new();
-    
+
     for (i, field) in fields.iter().enumerate() {
         let field_ident = match &field.ident {
             Some(ident) => ident.to_token_stream(),
@@ -38,13 +38,13 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
     let mut output = quote! {
         impl #impl_generics ::rumpsteak_aura::Role for #ident #ty_generics #where_clause {
             type Message = #message;
-            
+
             fn seal(&mut self) {
                 #(
                     ::rumpsteak_aura::Sealable::seal(&mut self.#field_idents);
                 )*
             }
-            
+
             fn is_sealed(&self) -> bool {
                 // Return true if any route is sealed
                 #(

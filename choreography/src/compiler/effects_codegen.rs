@@ -3,9 +3,9 @@
 // This module generates protocol implementations that build
 // effect programs using a free algebra approach.
 
-use crate::ast::{Choreography, Condition, Protocol, Role, MessageType};
-use quote::{quote, format_ident};
+use crate::ast::{Choreography, Condition, MessageType, Protocol, Role};
 use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
 use std::collections::HashSet;
 
 /// Generate effect-based protocol implementation
@@ -15,78 +15,81 @@ pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
     let messages = generate_message_types(&choreography.protocol);
     let role_functions = generate_role_functions(choreography);
     let endpoint_type = generate_endpoint_type(protocol_name);
-    
+
     quote! {
         use rumpsteak_choreography::{
-            ChoreoHandler, Result, Label, Program, Effect, 
+            ChoreoHandler, Result, Label, Program, Effect,
             interpret, InterpretResult, ProgramMessage
         };
         use serde::{Serialize, Deserialize};
-        
+
         // Common message trait for this choreography
         #[derive(Clone, Debug, Serialize, Deserialize)]
         pub enum Message {
             // Generated message variants would go here
             Default,
         }
-        
+
         impl ProgramMessage for Message {}
-        
+
         #roles
-        
+
         #endpoint_type
-        
+
         #messages
-        
+
         #role_functions
     }
 }
 
 fn generate_role_enum(roles: &[Role]) -> TokenStream {
     let role_names: Vec<_> = roles.iter().map(|r| &r.name).collect();
-    
+
     quote! {
         #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
         pub enum Role {
             #(#role_names),*
         }
-        
+
         impl rumpsteak::effects::RoleId for Role {}
     }
 }
 
 fn generate_endpoint_type(protocol_name: &proc_macro2::Ident) -> TokenStream {
     let ep_name = format_ident!("{}Endpoint", protocol_name);
-    
+
     quote! {
         pub struct #ep_name {
             // Protocol-specific endpoint state
         }
-        
+
         impl rumpsteak::effects::Endpoint for #ep_name {}
     }
 }
 
 fn generate_message_types(protocol: &Protocol) -> TokenStream {
     let mut message_types = HashSet::new();
-    
+
     // Collect unique message types from protocol
     collect_message_types(protocol, &mut message_types);
-    
-    let message_structs: Vec<_> = message_types.into_iter().map(|msg_type| {
-        let type_name = &msg_type.name;
-        let content_type = if let Some(ref payload) = msg_type.payload {
-            payload.clone()
-        } else {
-            infer_content_type(&msg_type.name.to_string())
-        };
-        
-        quote! {
-            #[derive(Clone, Debug, Serialize, Deserialize)]
-            pub struct #type_name(pub #content_type);
-        }
-    }).collect();
-    
+
+    let message_structs: Vec<_> = message_types
+        .into_iter()
+        .map(|msg_type| {
+            let type_name = &msg_type.name;
+            let content_type = if let Some(ref payload) = msg_type.payload {
+                payload.clone()
+            } else {
+                infer_content_type(&msg_type.name.to_string())
+            };
+
+            quote! {
+                #[derive(Clone, Debug, Serialize, Deserialize)]
+                pub struct #type_name(pub #content_type);
+            }
+        })
+        .collect();
+
     quote! {
         #(#message_structs)*
     }
@@ -94,11 +97,19 @@ fn generate_message_types(protocol: &Protocol) -> TokenStream {
 
 fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<MessageType>) {
     match protocol {
-        Protocol::Send { message, continuation, .. } => {
+        Protocol::Send {
+            message,
+            continuation,
+            ..
+        } => {
             message_types.insert(message.clone());
             collect_message_types(continuation, message_types);
         }
-        Protocol::Broadcast { message, continuation, .. } => {
+        Protocol::Broadcast {
+            message,
+            continuation,
+            ..
+        } => {
             message_types.insert(message.clone());
             collect_message_types(continuation, message_types);
         }
@@ -123,31 +134,35 @@ fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<Messag
 }
 
 fn generate_role_functions(choreography: &Choreography) -> TokenStream {
-    choreography.roles.iter().map(|role| {
-        let role_name_str = role.name.to_string().to_lowercase();
-        let program_fn_name = format_ident!("{}_program", role_name_str);
-        let run_fn_name = format_ident!("run_{}", role_name_str);
-        let protocol_name = &choreography.name;
-        let endpoint_type = format_ident!("{}Endpoint", protocol_name);
-        
-        let body = generate_role_body(&choreography.protocol, role);
-        
-        quote! {
-            /// Generate the choreographic program for this role
-            pub fn #program_fn_name() -> Program<Role, Message> {
-                #body
+    choreography
+        .roles
+        .iter()
+        .map(|role| {
+            let role_name_str = role.name.to_string().to_lowercase();
+            let program_fn_name = format_ident!("{}_program", role_name_str);
+            let run_fn_name = format_ident!("run_{}", role_name_str);
+            let protocol_name = &choreography.name;
+            let endpoint_type = format_ident!("{}Endpoint", protocol_name);
+
+            let body = generate_role_body(&choreography.protocol, role);
+
+            quote! {
+                /// Generate the choreographic program for this role
+                pub fn #program_fn_name() -> Program<Role, Message> {
+                    #body
+                }
+
+                /// Run the choreographic program for this role using a handler
+                pub async fn #run_fn_name<H: ChoreoHandler<Role = Role, Endpoint = #endpoint_type>>(
+                    handler: &mut H,
+                    endpoint: &mut #endpoint_type,
+                ) -> Result<InterpretResult<Message>> {
+                    let program = #program_fn_name();
+                    interpret(handler, endpoint, program).await
+                }
             }
-            
-            /// Run the choreographic program for this role using a handler
-            pub async fn #run_fn_name<H: ChoreoHandler<Role = Role, Endpoint = #endpoint_type>>(
-                handler: &mut H,
-                endpoint: &mut #endpoint_type,
-            ) -> Result<InterpretResult<Message>> {
-                let program = #program_fn_name();
-                interpret(handler, endpoint, program).await
-            }
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 fn generate_role_body(protocol: &Protocol, role: &Role) -> TokenStream {
@@ -157,10 +172,10 @@ fn generate_role_body(protocol: &Protocol, role: &Role) -> TokenStream {
 /// Generate program builder code for a protocol from the perspective of a specific role
 fn generate_program_builder(protocol: &Protocol, role: &Role) -> TokenStream {
     let program_effects = generate_program_effects(protocol, role);
-    
+
     quote! {
         use rumpsteak_choreography::{Program, Effect, Label};
-        
+
         Program::new()
             #program_effects
             .end()
@@ -173,14 +188,19 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         Protocol::End => {
             quote! {}
         }
-        Protocol::Send { from, to, message, continuation } => {
+        Protocol::Send {
+            from,
+            to,
+            message,
+            continuation,
+        } => {
             let continuation_effects = generate_program_effects(continuation, role);
-            
+
             if from == role {
                 // This role is sending
                 let message_type = &message.name;
                 let to_ident = &to.name;
-                
+
                 quote! {
                     .send(Role::#to_ident, #message_type::default())
                     #continuation_effects
@@ -189,7 +209,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 // This role is receiving
                 let message_type = &message.name;
                 let from_ident = &from.name;
-                
+
                 quote! {
                     .recv::<#message_type>(Role::#from_ident)
                     #continuation_effects
@@ -199,29 +219,33 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                 continuation_effects
             }
         }
-        Protocol::Choice { role: choice_role, branches } => {
+        Protocol::Choice {
+            role: choice_role,
+            branches,
+        } => {
             // Generate Branch effect with all possible continuations
             let choice_role_name = &choice_role.name;
-            
+
             // Generate all branch continuations
-            let branch_programs: Vec<_> = branches.iter()
+            let branch_programs: Vec<_> = branches
+                .iter()
                 .map(|branch| {
                     let label_str = branch.label.to_string();
                     let branch_effects = generate_program_effects(&branch.protocol, role);
-                    
+
                     quote! {
                         (Label(#label_str), Program::new()#branch_effects)
                     }
                 })
                 .collect();
-            
+
             if choice_role == role {
                 // This role is making the choice
                 // Generate code that chooses the first branch as default
                 // In a real implementation, this would accept a decision function
                 if let Some(first_branch) = branches.first() {
                     let label_str = first_branch.label.to_string();
-                    
+
                     quote! {
                         .choose(Role::#choice_role_name, Label(#label_str))
                         .branch(Role::#choice_role_name, vec![#(#branch_programs),*])
@@ -240,7 +264,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         }
         Protocol::Loop { body, condition } => {
             let body_effects = generate_program_effects(body, role);
-            
+
             // Generate Loop effect with runtime iteration control
             match condition {
                 Some(Condition::Count(n)) => {
@@ -253,7 +277,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                     // Role-based loop control via choice mechanism
                     // The deciding role uses choices to signal continue/break
                     // Other roles follow the decision
-                    
+
                     if deciding_role == role {
                         // This role decides - wrap body in a choice-controlled loop
                         // The choice determines whether to continue or break
@@ -296,10 +320,11 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         }
         Protocol::Parallel { protocols } => {
             // For simplicity, execute sequentially in program building
-            let parallel_effects: Vec<TokenStream> = protocols.iter()
+            let parallel_effects: Vec<TokenStream> = protocols
+                .iter()
                 .map(|p| generate_program_effects(p, role))
                 .collect();
-            
+
             quote! {
                 #(#parallel_effects)*
             }
@@ -308,13 +333,19 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             // For simplicity, treat recursion as a simple body
             generate_program_effects(body, role)
         }
-        Protocol::Broadcast { from, to_all, message, continuation } => {
+        Protocol::Broadcast {
+            from,
+            to_all,
+            message,
+            continuation,
+        } => {
             let continuation_effects = generate_program_effects(continuation, role);
             let message_type = &message.name;
-            
+
             if from == role {
                 // This role is broadcasting - send to all recipients
-                let sends: Vec<TokenStream> = to_all.iter()
+                let sends: Vec<TokenStream> = to_all
+                    .iter()
                     .map(|to| {
                         let to_ident = &to.name;
                         quote! {
@@ -322,7 +353,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
                         }
                     })
                     .collect();
-                
+
                 quote! {
                     #(#sends)*
                     #continuation_effects
@@ -330,7 +361,7 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
             } else if to_all.contains(role) {
                 // This role is receiving the broadcast
                 let from_ident = &from.name;
-                
+
                 quote! {
                     .recv::<#message_type>(Role::#from_ident)
                     #continuation_effects
@@ -375,7 +406,7 @@ fn infer_content_type(message_type: &str) -> TokenStream {
 mod tests {
     use super::*;
     use crate::ast::{Protocol, Role};
-    
+
     #[test]
     fn test_generate_simple_protocol() {
         let choreography = Choreography {
@@ -387,10 +418,10 @@ mod tests {
             protocol: Protocol::End,
             attrs: std::collections::HashMap::new(),
         };
-        
+
         let code = generate_effects_protocol(&choreography);
         let code_str = code.to_string();
-        
+
         assert!(code_str.contains("enum Role"));
         assert!(code_str.contains("Client"));
         assert!(code_str.contains("Server"));

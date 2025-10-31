@@ -1,3 +1,40 @@
 target/
 
-Cargo.lock
+# Nix build artifacts
+result
+result-*
+.direnv/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor backup files
+*.swp
+*.swo
+*~
+*.bak
+**/*.rs.bk
+
+# IDE / AI
+.vscode/
+.idea/
+*.iml
+CLAUDE.md
+.claude/
+.cursor/
+AGENTS.md
+.agents/
+
+# Rust analyzer artifacts
+rust-project.json
+
+# Merge artifacts
+*.orig
+
+# Local cargo config
+.cargo/config.toml.local
+
+# Working
+work/

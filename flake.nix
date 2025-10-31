@@ -17,11 +17,14 @@
         
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
+          targets = [ "wasm32-unknown-unknown" ];
         };
 
         nativeBuildInputs = with pkgs; [
           rustToolchain
           pkg-config
+          wasm-pack
+          wasm-bindgen-cli
         ];
 
         buildInputs = with pkgs; [
@@ -39,6 +42,8 @@
             echo "Rumpsteak Aura development environment"
             echo "Rust version: $(rustc --version)"
             echo "Cargo version: $(cargo --version)"
+            echo "WASM target: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
+            echo "wasm-pack: $(wasm-pack --version 2>/dev/null || echo 'installed')"
           '';
         };
 

@@ -1,0 +1,112 @@
+// Choreographic DSL Grammar
+// Defines syntax for choreographic protocol specifications
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* ~ "\n" | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
+// Top-level choreography definition
+choreography = {
+    SOI ~ annotation* ~ "choreography" ~ ident ~ "{" ~ roles_decl ~ protocol_defs? ~ protocol_body ~ "}" ~ EOI
+}
+
+// Annotations (for optimization hints, verification, etc.)
+annotation = { "@" ~ ident ~ annotation_args? }
+annotation_args = { "(" ~ annotation_arg_list? ~ ")" }
+annotation_arg_list = { annotation_arg ~ ("," ~ annotation_arg)* }
+annotation_arg = { ident ~ ("=" ~ annotation_value)? }
+annotation_value = { string | integer | ident }
+
+// Protocol definitions (sub-protocols)
+protocol_defs = { protocol_def+ }
+protocol_def = {
+    "protocol" ~ ident ~ "{" ~ protocol_body ~ "}"
+}
+
+// Role declarations
+roles_decl = { "roles" ~ ":" ~ role_list }
+role_list = { role_decl ~ ("," ~ role_decl)* }
+role_decl = { ident ~ role_param? }
+role_param = { "[" ~ (integer | ident) ~ "]" }
+
+// Protocol body (sequence of statements)
+protocol_body = { statement* }
+
+// Statement types (can be annotated)
+statement = _{
+    annotated_stmt
+}
+
+annotated_stmt = {
+    annotation* ~ (send_stmt | broadcast_stmt | choice_stmt | loop_stmt | parallel_stmt | rec_stmt | call_stmt)
+}
+
+// Protocol call statement
+call_stmt = { "call" ~ ident }
+
+// Send statement: A -> B: Message(payload)
+send_stmt = { role_ref ~ "->" ~ role_ref ~ ":" ~ message }
+
+// Broadcast statement: A ->* : Message(payload)
+broadcast_stmt = { role_ref ~ "->*" ~ ":" ~ message }
+
+// Role reference (can be simple or indexed)
+role_ref = { ident ~ role_index? }
+role_index = { "[" ~ role_index_expr ~ "]" }
+role_index_expr = { (!("]") ~ ANY)+ }
+
+// Choice statement
+choice_stmt = {
+    "choice" ~ ident ~ "{" ~ choice_branch+ ~ "}"
+}
+
+choice_branch = {
+    ident ~ guard? ~ ":" ~ "{" ~ protocol_body ~ "}"
+}
+
+// Guard condition for choice branches
+guard = { "when" ~ "(" ~ guard_expr ~ ")" }
+guard_expr = { (!")" ~ ANY)+ }
+
+// Loop statement
+loop_stmt = {
+    "loop" ~ loop_condition? ~ "{" ~ protocol_body ~ "}"
+}
+
+loop_condition = _{
+    count_condition
+    | role_decides_condition
+    | custom_condition
+}
+
+count_condition = { "(" ~ "count" ~ ":" ~ (integer | ident) ~ ")" }
+role_decides_condition = { "(" ~ "decides" ~ ":" ~ ident ~ ")" }
+custom_condition = { "(" ~ "custom" ~ ":" ~ string ~ ")" }
+
+// Parallel composition
+parallel_stmt = {
+    "parallel" ~ "{" ~ parallel_branch ~ ("|" ~ parallel_branch)* ~ "}"
+}
+
+parallel_branch = { protocol_body }
+
+// Recursive protocol
+rec_stmt = {
+    "rec" ~ ident ~ "{" ~ protocol_body ~ "}"
+}
+
+// Message specification
+message = { ident ~ message_type? ~ payload? }
+
+message_type = { "<" ~ type_spec ~ ("," ~ type_spec)* ~ ">" }
+type_spec = { type_path ~ type_generics? }
+type_path = { ident ~ ("::" ~ ident)* }
+type_generics = { "<" ~ type_spec ~ ("," ~ type_spec)* ~ ">" }
+
+payload = { "(" ~ payload_content ~ ")" }
+payload_content = { (!(")" | ",") ~ ANY)* ~ ("," ~ (!(")" | ",") ~ ANY)*)* }
+
+// Basic tokens
+ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+integer = @{ ASCII_DIGIT+ }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+

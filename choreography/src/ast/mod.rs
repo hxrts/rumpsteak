@@ -21,9 +21,10 @@ pub mod role;
 /// Validation errors and utilities
 pub mod validation;
 
-pub use choreography::*;
-pub use local_type::*;
-pub use message::*;
-pub use protocol::*;
-pub use role::*;
-pub use validation::*;
+// Re-export core AST types explicitly for clarity
+pub use choreography::Choreography;
+pub use local_type::LocalType;
+pub use message::MessageType;
+pub use protocol::{Branch, Condition, Protocol};
+pub use role::Role;
+pub use validation::ValidationError;

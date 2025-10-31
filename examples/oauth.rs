@@ -93,6 +93,7 @@ struct Again(i32);
 
 struct Auth(i32);
 
+#[allow(dead_code)]
 struct Quit(i32);
 
 #[session]
@@ -116,6 +117,7 @@ type ProtoS = Select<C, ProtoS0>;
 #[session]
 enum ProtoS0 {
     Cancel(Cancel, End),
+    #[allow(dead_code)]
     Login(Login, Branch<A, ProtoS2>),
 }
 

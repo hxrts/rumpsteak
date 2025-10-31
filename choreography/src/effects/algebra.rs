@@ -3,50 +3,50 @@
 // This module provides a data representation of choreographic programs
 // that can be analyzed, transformed, and interpreted separately from execution.
 
+use crate::effects::{Label, RoleId};
 use std::collections::HashSet;
 use std::time::Duration;
-use crate::effects::{Label, RoleId};
 
 /// A choreographic effect that can be performed by a role
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect<R: RoleId, M> {
     /// Send a message to another role
     Send { to: R, msg: M },
-    
+
     /// Receive a message from another role
     Recv { from: R, msg_type: &'static str },
-    
+
     /// Make an internal choice and broadcast the label
     Choose { at: R, label: Label },
-    
+
     /// Wait for an external choice from another role
     Offer { from: R },
-    
+
     /// Branch based on a choice - includes all possible continuations
     /// The choosing role has already selected via Choose effect
     /// Other roles use Offer to receive the label, then select matching branch
-    Branch { 
+    Branch {
         choosing_role: R,
         branches: Vec<(Label, Program<R, M>)>,
     },
-    
+
     /// Loop that executes body a fixed number of times or until a condition
     Loop {
         /// Number of iterations (None = infinite/until break)
         iterations: Option<usize>,
         body: Box<Program<R, M>>,
     },
-    
+
     /// Execute a sub-program with a timeout
-    Timeout { 
-        at: R, 
-        dur: Duration, 
-        body: Box<Program<R, M>> 
+    Timeout {
+        at: R,
+        dur: Duration,
+        body: Box<Program<R, M>>,
     },
-    
+
     /// Execute multiple programs in parallel
     Parallel { programs: Vec<Program<R, M>> },
-    
+
     /// End of program
     End,
 }
@@ -64,96 +64,99 @@ impl<R: RoleId, M> Program<R, M> {
             effects: Vec::new(),
         }
     }
-    
+
     /// Add a send effect
     pub fn send(mut self, to: R, msg: M) -> Self {
         self.effects.push(Effect::Send { to, msg });
         self
     }
-    
+
     /// Add a receive effect
     pub fn recv<T: 'static>(mut self, from: R) -> Self {
-        self.effects.push(Effect::Recv { 
-            from, 
-            msg_type: std::any::type_name::<T>() 
+        self.effects.push(Effect::Recv {
+            from,
+            msg_type: std::any::type_name::<T>(),
         });
         self
     }
-    
+
     /// Add a choice effect
     pub fn choose(mut self, at: R, label: Label) -> Self {
         self.effects.push(Effect::Choose { at, label });
         self
     }
-    
+
     /// Add an offer effect
     pub fn offer(mut self, from: R) -> Self {
         self.effects.push(Effect::Offer { from });
         self
     }
-    
+
     /// Add a timeout effect
     pub fn with_timeout(mut self, at: R, dur: Duration, body: Program<R, M>) -> Self {
-        self.effects.push(Effect::Timeout { 
-            at, 
-            dur, 
-            body: Box::new(body) 
+        self.effects.push(Effect::Timeout {
+            at,
+            dur,
+            body: Box::new(body),
         });
         self
     }
-    
+
     /// Add a parallel composition effect
     pub fn parallel(mut self, programs: Vec<Program<R, M>>) -> Self {
         self.effects.push(Effect::Parallel { programs });
         self
     }
-    
+
     /// Add a branch effect with multiple labeled continuations
     pub fn branch(mut self, choosing_role: R, branches: Vec<(Label, Program<R, M>)>) -> Self {
-        self.effects.push(Effect::Branch { choosing_role, branches });
+        self.effects.push(Effect::Branch {
+            choosing_role,
+            branches,
+        });
         self
     }
-    
+
     /// Add a loop effect
     pub fn loop_n(mut self, iterations: usize, body: Program<R, M>) -> Self {
-        self.effects.push(Effect::Loop { 
+        self.effects.push(Effect::Loop {
             iterations: Some(iterations),
-            body: Box::new(body) 
+            body: Box::new(body),
         });
         self
     }
-    
+
     /// Add an infinite loop effect (or until break)
     pub fn loop_inf(mut self, body: Program<R, M>) -> Self {
-        self.effects.push(Effect::Loop { 
+        self.effects.push(Effect::Loop {
             iterations: None,
-            body: Box::new(body) 
+            body: Box::new(body),
         });
         self
     }
-    
+
     /// Mark the end of the program
     pub fn end(mut self) -> Self {
         self.effects.push(Effect::End);
         self
     }
-    
+
     /// Extend this program with another program
     pub fn then(mut self, other: Program<R, M>) -> Self {
         self.effects.extend(other.effects);
         self
     }
-    
+
     /// Create a program that executes multiple programs in parallel
     pub fn par(programs: Vec<Program<R, M>>) -> Self {
         Self::new().parallel(programs)
     }
-    
+
     /// Check if the program is empty
     pub fn is_empty(&self) -> bool {
         self.effects.is_empty()
     }
-    
+
     /// Get the length of the program (number of effects)
     pub fn len(&self) -> usize {
         self.effects.len()
@@ -174,15 +177,26 @@ impl<R: RoleId, M> Program<R, M> {
         self.collect_roles(&mut roles);
         roles
     }
-    
+
     fn collect_roles(&self, roles: &mut HashSet<R>) {
         for effect in &self.effects {
             match effect {
-                Effect::Send { to, .. } => { roles.insert(*to); }
-                Effect::Recv { from, .. } => { roles.insert(*from); }
-                Effect::Choose { at, .. } => { roles.insert(*at); }
-                Effect::Offer { from } => { roles.insert(*from); }
-                Effect::Branch { choosing_role, branches } => {
+                Effect::Send { to, .. } => {
+                    roles.insert(*to);
+                }
+                Effect::Recv { from, .. } => {
+                    roles.insert(*from);
+                }
+                Effect::Choose { at, .. } => {
+                    roles.insert(*at);
+                }
+                Effect::Offer { from } => {
+                    roles.insert(*from);
+                }
+                Effect::Branch {
+                    choosing_role,
+                    branches,
+                } => {
                     roles.insert(*choosing_role);
                     for (_, prog) in branches {
                         prog.collect_roles(roles);
@@ -204,41 +218,59 @@ impl<R: RoleId, M> Program<R, M> {
             }
         }
     }
-    
+
     /// Count the number of send operations
     pub fn send_count(&self) -> usize {
-        self.effects.iter().map(|e| match e {
-            Effect::Send { .. } => 1,
-            Effect::Branch { branches, .. } => branches.iter().map(|(_, p)| p.send_count()).max().unwrap_or(0),
-            Effect::Loop { body, .. } => body.send_count(),
-            Effect::Timeout { body, .. } => body.send_count(),
-            Effect::Parallel { programs } => programs.iter().map(|p| p.send_count()).sum(),
-            _ => 0,
-        }).sum()
+        self.effects
+            .iter()
+            .map(|e| match e {
+                Effect::Send { .. } => 1,
+                Effect::Branch { branches, .. } => branches
+                    .iter()
+                    .map(|(_, p)| p.send_count())
+                    .max()
+                    .unwrap_or(0),
+                Effect::Loop { body, .. } => body.send_count(),
+                Effect::Timeout { body, .. } => body.send_count(),
+                Effect::Parallel { programs } => programs.iter().map(|p| p.send_count()).sum(),
+                _ => 0,
+            })
+            .sum()
     }
-    
+
     /// Count the number of receive operations
     pub fn recv_count(&self) -> usize {
-        self.effects.iter().map(|e| match e {
-            Effect::Recv { .. } => 1,
-            Effect::Branch { branches, .. } => branches.iter().map(|(_, p)| p.recv_count()).max().unwrap_or(0),
-            Effect::Loop { body, .. } => body.recv_count(),
-            Effect::Timeout { body, .. } => body.recv_count(),
-            Effect::Parallel { programs } => programs.iter().map(|p| p.recv_count()).sum(),
-            _ => 0,
-        }).sum()
+        self.effects
+            .iter()
+            .map(|e| match e {
+                Effect::Recv { .. } => 1,
+                Effect::Branch { branches, .. } => branches
+                    .iter()
+                    .map(|(_, p)| p.recv_count())
+                    .max()
+                    .unwrap_or(0),
+                Effect::Loop { body, .. } => body.recv_count(),
+                Effect::Timeout { body, .. } => body.recv_count(),
+                Effect::Parallel { programs } => programs.iter().map(|p| p.recv_count()).sum(),
+                _ => 0,
+            })
+            .sum()
     }
-    
+
     /// Check if the program has any timeout effects
     pub fn has_timeouts(&self) -> bool {
-        self.effects.iter().any(|e| matches!(e, Effect::Timeout { .. }))
+        self.effects
+            .iter()
+            .any(|e| matches!(e, Effect::Timeout { .. }))
     }
-    
+
     /// Check if the program has any parallel effects
     pub fn has_parallel(&self) -> bool {
-        self.effects.iter().any(|e| matches!(e, Effect::Parallel { .. }))
+        self.effects
+            .iter()
+            .any(|e| matches!(e, Effect::Parallel { .. }))
     }
-    
+
     /// Validate that the program is well-formed
     pub fn validate(&self) -> Result<(), ProgramError> {
         for effect in &self.effects {
@@ -246,7 +278,7 @@ impl<R: RoleId, M> Program<R, M> {
                 Effect::Branch { branches, .. } => {
                     if branches.is_empty() {
                         return Err(ProgramError::InvalidStructure(
-                            "Branch must have at least one branch".to_string()
+                            "Branch must have at least one branch".to_string(),
                         ));
                     }
                     for (_, prog) in branches {
@@ -272,10 +304,10 @@ impl<R: RoleId, M> Program<R, M> {
 pub enum ProgramError {
     /// Program contains invalid structure
     InvalidStructure(String),
-    
+
     /// Program has unbalanced send/receive operations
     UnbalancedCommunication,
-    
+
     /// Program contains unreachable effects
     UnreachableCode,
 }
@@ -284,7 +316,9 @@ impl std::fmt::Display for ProgramError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ProgramError::InvalidStructure(msg) => write!(f, "Invalid program structure: {}", msg),
-            ProgramError::UnbalancedCommunication => write!(f, "Unbalanced send/receive operations"),
+            ProgramError::UnbalancedCommunication => {
+                write!(f, "Unbalanced send/receive operations")
+            }
             ProgramError::UnreachableCode => write!(f, "Program contains unreachable code"),
         }
     }
@@ -297,7 +331,7 @@ impl std::error::Error for ProgramError {}
 pub struct InterpretResult<M> {
     /// Messages received during execution
     pub received_values: Vec<M>,
-    
+
     /// Final state of the interpreter
     pub final_state: InterpreterState,
 }
@@ -307,10 +341,10 @@ pub struct InterpretResult<M> {
 pub enum InterpreterState {
     /// Program completed successfully
     Completed,
-    
+
     /// Program was interrupted by timeout
     Timeout,
-    
+
     /// Program failed with an error
     Failed(String),
 }

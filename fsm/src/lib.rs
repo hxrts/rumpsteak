@@ -18,7 +18,7 @@
 //! ```rust
 //! use rumpsteak_fsm::{Fsm, Action, Message, Transition};
 //!
-//! let mut fsm = Fsm::new("Client");
+//! let mut fsm: Fsm<&str, &str, ()> = Fsm::new("Client");
 //! let s0 = fsm.add_state();
 //! let s1 = fsm.add_state();
 //!

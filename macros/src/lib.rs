@@ -11,12 +11,12 @@
 
 use proc_macro::TokenStream;
 
+mod choreography;
 mod message;
 mod parse;
 mod role;
 mod roles;
 mod session;
-mod choreography;
 
 /// Derives the `Message` trait for message types.
 ///

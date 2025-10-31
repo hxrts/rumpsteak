@@ -10,7 +10,7 @@
 // Future work: If FSM construction API is made public, expand these tests
 // to cover:
 // - Transitivity (A <: B && B <: C => A <: C)
-// - Contravariance/covariance properties  
+// - Contravariance/covariance properties
 // - Complex protocol combinations
 
 use proptest::prelude::*;
@@ -43,7 +43,7 @@ mod unit_tests {
     /// - Reflexivity: is_subtype(fsm, fsm) == true
     /// - Transitivity: is_subtype(a, b) && is_subtype(b, c) => is_subtype(a, c)
     /// - Consistency: repeated calls give same result
-    
+
     #[test]
     fn test_module_compiles() {
         // This test just verifies the subtyping module compiles
@@ -60,4 +60,3 @@ mod disabled_tests {
         println!("Subtyping tests require the 'subtyping' feature to be enabled");
     }
 }
-
