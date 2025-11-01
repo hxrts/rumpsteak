@@ -1,4 +1,6 @@
-# :meat_on_bone: Rumpsteak
+# Rumpsteak (Aura)
+
+**This is a fork of Zak Cutner's [Rumpsteak](https://github.com/zakcutner/rumpsteak) library, which adds a choreographic programming DSL which generates session typed code with an effect API.**
 
 [![Actions](https://github.com/zakcutner/rumpsteak/workflows/Check/badge.svg)](https://github.com/zakcutner/rumpsteak/actions)
 [![Crate](https://img.shields.io/crates/v/rumpsteak)](https://crates.io/crates/rumpsteak)
@@ -32,85 +34,47 @@ This is the Aura fork of Rumpsteak with enhanced choreographic programming suppo
 
 ```toml
 [dependencies]
-rumpsteak-aura = { git = "https://github.com/aura-project/rumpsteak-aura" }
+rumpsteak-aura = { git = "https://github.com/hxrts/rumpsteak-aura" }
 ```
 
 For choreographic programming:
 ```toml
 [dependencies]
-rumpsteak-choreography = { git = "https://github.com/aura-project/rumpsteak-aura" }
+rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura" }
 ```
 
 ## Example
 
+Define a protocol using the choreographic DSL:
+
 ```rust
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join,
-};
-use rumpsteak::{
-    channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
-};
-use std::{error::Error, result};
+use rumpsteak_choreography::choreography;
 
-type Result<T> = result::Result<T, Box<dyn Error>>;
-
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-#[derive(Roles)]
-struct Roles(C, S);
-
-#[derive(Role)]
-#[message(Label)]
-struct C(#[route(S)] Channel);
-
-#[derive(Role)]
-#[message(Label)]
-struct S(#[route(C)] Channel);
-
-#[derive(Message)]
-enum Label {
-    Add(Add),
-    Sum(Sum),
-}
-
-struct Add(i32);
-struct Sum(i32);
-
-#[session]
-type Client = Send<S, Add, Send<S, Add, Receive<S, Sum, End>>>;
-
-#[session]
-type Server = Receive<C, Add, Receive<C, Add, Send<C, Sum, End>>>;
-
-async fn client(role: &mut C, x: i32, y: i32) -> Result<i32> {
-    try_session(role, |s: Client<'_, _>| async {
-        let s = s.send(Add(x)).await?;
-        let s = s.send(Add(y)).await?;
-        let (Sum(z), s) = s.receive().await?;
-        Ok((z, s))
-    })
-    .await
-}
-
-async fn server(role: &mut S) -> Result<()> {
-    try_session(role, |s: Server<'_, _>| async {
-        let (Add(x), s) = s.receive().await?;
-        let (Add(y), s) = s.receive().await?;
-        let s = s.send(Sum(x + y)).await?;
-        Ok(((), s))
-    })
-    .await
-}
-
-fn main() {
-    let Roles(mut c, mut s) = Roles::default();
-    executor::block_on(async {
-        let (output, _) = try_join!(client(&mut c, 1, 2), server(&mut s)).unwrap();
-        assert_eq!(output, 3);
-    });
+choreography! {
+    PingPong {
+        roles: Alice, Bob
+        Alice -> Bob: Ping
+        Bob -> Alice: Pong
+    }
 }
 ```
+
+Run the protocol with the effect handler system:
+
+```rust
+use rumpsteak_choreography::{InMemoryHandler, Program, interpret};
+
+let mut handler = InMemoryHandler::new(Role::Alice);
+let program = Program::new()
+    .send(Role::Bob, Message::Ping)
+    .recv::<Message>(Role::Bob)
+    .end();
+
+let mut endpoint = ();
+let result = interpret(&mut handler, &mut endpoint, program).await?;
+```
+
+The choreography macro generates role types, message types, and session types automatically. The effect handler system decouples protocol logic from transport—use `InMemoryHandler` for testing or `RumpsteakHandler` for production. See `docs/` for comprehensive guides.
 
 ## Structure
 
@@ -120,13 +84,9 @@ HTTP cache case study backed by Redis.
 
 #### `choreography/`
 
-Choreographic programming layer enabling global protocol specification with automatic projection to local session types. Includes:
-- DSL Parser: Pest-based parser for `.choreography` files with protocol composition, guards, annotations, and parameterized roles
-- Effect Handler System: Transport-agnostic protocol implementations with middleware support
-- Multiple Handlers: `InMemoryHandler` for testing, `RumpsteakHandler` for production distributed execution
-- Session State Tracking: Metadata tracking for debugging and monitoring
-- Complete Documentation: Comprehensive guides in `docs/` directory
-- WebAssembly Support: Works in browser environments
+Choreographic programming layer for global protocol specification with automatic projection to local session types. Includes a Pest-based DSL parser for `.choreography` files with support for protocol composition, guards, annotations, and parameterized roles.
+
+A transport-agnostic effect handler system, with `InMemoryHandler` for testing and `RumpsteakHandler` for production distributed execution. The effect handler system also provides middleware support for tracing, retry, metrics, and fault injection. Session state tracking provides metadata for debugging and monitoring. The system works seamlessly in browser environments with WebAssembly support. Comprehensive guides are available in the `docs/` directory.
 
 *This is the primary extension of the original version with significant enhancements.*
 
@@ -144,24 +104,10 @@ Crate for procedural macros used within Rumpsteak's API.
 
 ## WebAssembly Support
 
-Rumpsteak supports compilation to WebAssembly. The core session types and choreography system can run in browser environments. See `examples/wasm-ping-pong/` for a complete example and `docs/07_wasm_guide.md` for implementation details.
+Supports compilation to WebAssembly, allowing the core session types and choreography system to run in browser environments. Both the effect handlers and platform-agnostic runtime abstraction work seamlessly in WASM, enabling you to implement custom network transports using `ChoreoHandler` with WebSockets, WebRTC, or other browser APIs. The `examples/wasm-ping-pong/` directory contains a working example.
 
-Key features:
-- Core session types compile to WASM
-- Effect handlers work in browser
-- Platform-agnostic runtime abstraction
-- Example with browser deployment
-- Supports custom network transports - Implement `ChoreoHandler` with WebSockets, WebRTC, etc.
-
-Quick start:
-```bash
-cd examples/wasm-ping-pong
-./build.sh  # or: wasm-pack build --target web
-# Serve and open in browser
-```
-
-Custom network handlers: See `docs/07_wasm_guide.md` for implementing WebSocket/WebRTC handlers for real distributed protocols in WASM.
+To get started, run `cd examples/wasm-ping-pong && ./build.sh` (or `wasm-pack build --target web`).
 
 ## License
 
-Licensed under the MIT license. See the [LICENSE](LICENSE) file for details.
+Licensed under the MIT [license](LICENSE).

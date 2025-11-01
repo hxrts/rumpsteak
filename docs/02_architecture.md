@@ -120,7 +120,7 @@ Core trait:
 pub trait ChoreoHandler {
     type Role: RoleId;
     type Endpoint;
-    
+
     async fn send<M>(&mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M) -> Result<()>;
     async fn recv<M>(&mut self, ep: &mut Self::Endpoint, from: Self::Role) -> Result<M>;
     async fn choose(&mut self, ep: &mut Self::Endpoint, who: Self::Role, label: Label) -> Result<()>;
@@ -238,4 +238,4 @@ choreography/                Choreographic extensions
   └── examples/             Example protocols
 ```
 
-The choreography crate extends the [Rumpsteak](https://github.com/zakcutner/rumpsteak) library with high-level protocol specification.
+The choreography crate extends the Rumpsteak library with high-level protocol specification.

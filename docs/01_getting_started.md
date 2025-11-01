@@ -6,14 +6,16 @@ Add Rumpsteak to your project (using the Aura fork):
 
 ```toml
 [dependencies]
-rumpsteak-aura = { git = "https://github.com/aura-project/rumpsteak-aura" }
-rumpsteak-choreography = { git = "https://github.com/aura-project/rumpsteak-aura" }
+rumpsteak-aura = { git = "https://github.com/hxrts/rumpsteak-aura" }
+rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura" }
 ```
+
+Note on dependencies: `rumpsteak-aura` provides core session types and the foundation for type-safe distributed protocols. `rumpsteak-choreography` provides the choreographic DSL, effect handler system, and automatic projection. Both are needed for choreographic programming. If you only need core session types without choreographies, you can depend on just `rumpsteak-aura`.
 
 For WASM support, add the wasm feature:
 
 ```toml
-rumpsteak-choreography = { git = "https://github.com/aura-project/rumpsteak-aura", features = ["wasm"] }
+rumpsteak-choreography = { git = "https://github.com/hxrts/rumpsteak-aura", features = ["wasm"] }
 ```
 
 ## Creating a Choreography
